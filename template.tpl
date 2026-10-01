@@ -479,8 +479,9 @@ scenarios:
 - name: Native updates handle grant withdrawal and partial payloads
   code: |-
     var callback;
+    mock('injectScript', function (url, success) { success(); });
     mock('setInWindow', function (name, fn) { callback = fn; return true; });
-    mock('templateStorage', {getItem: function () {}, setItem: function () {}});
+    mockObject('templateStorage', {getItem: function () {}, setItem: function () {}});
     runCode({settingsId: 'fixture', globalDefaultsJson: '{}', regionList: '', waitForUpdateMs: 500});
     callback({ad_storage:'granted', analytics_storage:'granted', ad_user_data:'granted', ad_personalization:'granted'});
     assertApi('updateConsentState').wasCalledWith({ad_storage:'granted', analytics_storage:'granted', ad_user_data:'granted', ad_personalization:'granted'});
@@ -489,19 +490,19 @@ scenarios:
     assertApi('gtagSet').wasCalledWith('developer_id.dZTNmYW', true);
 - name: Repeated execution preserves existing consent
   code: |-
-    mock('templateStorage', {getItem: function () { return 'fixture'; }});
+    mockObject('templateStorage', {getItem: function () { return 'fixture'; }});
     runCode({settingsId: 'fixture'});
     assertApi('setDefaultConsentState').wasNotCalled();
     assertApi('injectScript').wasNotCalled();
 - name: Missing identity still establishes denied defaults
   code: |-
-    mock('templateStorage', {getItem: function () {}});
+    mockObject('templateStorage', {getItem: function () {}});
     runCode({settingsId: '', globalDefaultsJson:'{"ad_storage":"granted"}'});
     assertApi('setDefaultConsentState').wasCalledWith({ad_storage:'denied', analytics_storage:'denied', ad_user_data:'denied', ad_personalization:'denied',wait_for_update:500});
     assertApi('injectScript').wasNotCalled();
 - name: Loader failure revokes configured grants
   code: |-
-    mock('templateStorage', {getItem: function () {}, setItem: function () {}});
+    mockObject('templateStorage', {getItem: function () {}, setItem: function () {}});
     mock('setInWindow', function () { return true; });
     mock('injectScript', function (url, success, failure) { failure(); });
     runCode({settingsId:'fixture',globalDefaultsJson:'{"ad_storage":"granted"}',regionList:''});
