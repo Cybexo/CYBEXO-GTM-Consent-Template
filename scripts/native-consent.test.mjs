@@ -67,7 +67,7 @@ test('wait is bounded and settings ID is URL encoded',()=>{
 });
 test('fields and permissions cannot expose endpoint or attribution overrides',()=>{
  const params=JSON.parse(part('TEMPLATE_PARAMETERS'));assert.deepEqual(params.map(p=>p.name),['settingsId','globalDefaultsJson','regionList','regionDefaultsJson','waitForUpdateMs']);
- const permissions=JSON.parse(part('WEB_PERMISSIONS'));const globals=permissions.find(p=>p.instance.key.publicId==='access_globals');assert.ok(JSON.stringify(globals).includes('cybexoGtmConsentUpdate'));assert.ok(!code.includes("require('callInWindow')"));assert.ok(code.includes("require('updateConsentState')"));
+ const permissions=JSON.parse(part('WEB_PERMISSIONS'));const globals=permissions.find(p=>p.instance.key.publicId==='access_globals');assert.ok(JSON.stringify(globals).includes('cybexoGtmConsentUpdate')); const access=globals.instance.param[0].value.listItem[0]; assert.deepEqual(access.mapValue.slice(1).map(v=>v.boolean),[true,true,false]);assert.ok(!code.includes("require('callInWindow')"));assert.ok(code.includes("require('updateConsentState')"));
 });
 
 test('repeated execution after failed delivery does not claim success',()=>{const h=setup({failLoader:true});h.run();const count=h.calls.length;h.run();assert.equal(h.calls.at(-1)[0],'failure');assert.ok(!h.calls.slice(count).some(c=>c[0]==='success'));});
