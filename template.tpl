@@ -77,194 +77,97 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 
-const log                     = require('logToConsole');
-const injectScript            = require('injectScript');
-const gtagSet                 = require('gtagSet');
-const setDefaultConsentState  = require('setDefaultConsentState');
-const callLater               = require('callLater');
-const encodeUriComponent      = require('encodeUriComponent');
+const log = require('logToConsole');
+const injectScript = require('injectScript');
+const gtagSet = require('gtagSet');
+const setDefaultConsentState = require('setDefaultConsentState');
+const updateConsentState = require('updateConsentState');
+const setInWindow = require('setInWindow');
+const templateStorage = require('templateStorage');
+const JSON = require('JSON');
+const encodeUriComponent = require('encodeUriComponent');
 
-var CONSENT_KEYS = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
+var KEYS = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
 var CYBEXO_LOADER_URL = 'https://cmp.cybexo.com/loader.js';
 var CYBEXO_CDN_URL = 'https://edge.cybexo.com';
 var CYBEXO_ASSETS_URL = 'https://cmp.cybexo.com';
+var DEVELOPER_ID = 'dZTNmYW';
+var CALLBACK = 'cybexoGtmConsentUpdate';
 
-function toStr(v) {
-  return v == null ? '' : '' + v;
+function state(value, fallback) {
+  var parsed = typeof value === 'string' ? JSON.parse(value) : value;
+  var output = {};
+  for (var i = 0; i < KEYS.length; i++) {
+    var key = KEYS[i];
+    var candidate = parsed && typeof parsed === 'object' ? parsed[key] : undefined;
+    output[key] = candidate === 'granted' || candidate === 'denied'
+      ? candidate : (fallback ? fallback[key] : 'denied');
+  }
+  return output;
 }
-
-function toNumber(v, fallback) {
-  if (v == null || ('' + v).trim() === '') return fallback;
-  var n = (v * 1);
-  return (n === n) ? n : fallback;
-}
-
-function normalizeWaitForUpdate(v) {
-  var n = toNumber(v, 500);
-  if (n < 500) return 500;
-  return n;
-}
-
-function parseRegionCsv(csv) {
-  var s = toStr(csv).trim();
-  if (!s) return [];
-  var parts = s.split(',');
+function regions(csv) {
+  var parts = (csv || '').split(',');
   var out = [];
   for (var i = 0; i < parts.length; i++) {
-    var p = toStr(parts[i]).trim().toUpperCase();
-    if (p) out.push(p);
+    var region = parts[i].trim().toUpperCase();
+    if (region && out.indexOf(region) === -1) out.push(region);
   }
   return out;
 }
-
-function normalizeConsentState(candidate) {
-  if (!candidate || typeof candidate !== 'object') return null;
-  var out = {};
-  for (var i = 0; i < CONSENT_KEYS.length; i++) {
-    var key = CONSENT_KEYS[i];
-    var val = toStr(candidate[key]).toLowerCase();
-    if (val === 'granted' || val === 'denied') out[key] = val;
-  }
-  return out;
-}
-
-function parseJsonConsentState(str) {
-  var s = toStr(str).trim();
-  if (!s) return null;
-  if (s.charAt(0) !== '{' || s.charAt(s.length - 1) !== '}') return null;
-
-  var out = {};
-  for (var i = 0; i < CONSENT_KEYS.length; i++) {
-    var key = CONSENT_KEYS[i];
-    var marker = '"' + key + '"';
-    var start = s.indexOf(marker);
-    if (start === -1) continue;
-
-    var colon = s.indexOf(':', start + marker.length);
-    if (colon === -1) continue;
-
-    var pos = colon + 1;
-    while (pos < s.length) {
-      var ch = s.charAt(pos);
-      if (ch !== ' ' && ch !== '\n' && ch !== '\r' && ch !== '\t') break;
-      pos++;
-    }
-    if (pos >= s.length || s.charAt(pos) !== '"') continue;
-
-    pos++;
-    var end = s.indexOf('"', pos);
-    if (end === -1) continue;
-
-    var val = toStr(s.slice(pos, end)).toLowerCase();
-    if (val === 'granted' || val === 'denied') out[key] = val;
-  }
-  return out;
-}
-
-function parseOptionalUpdate(str) {
-  if (typeof str === 'object' && str !== null) return normalizeConsentState(str);
-  return parseJsonConsentState(str);
-}
-
-function parseConsentStateWithFallback(str, fallback) {
-  if (typeof str === 'object' && str !== null) {
-    var objOut = normalizeConsentState(str);
-    return hasConsentKeys(objOut) ? objOut : fallback;
-  }
-  var parsed = parseJsonConsentState(str);
-  return hasConsentKeys(parsed) ? parsed : fallback;
-}
-
-function hasConsentKeys(state) {
-  if (!state || typeof state !== 'object') return false;
-  for (var i = 0; i < CONSENT_KEYS.length; i++) {
-    if (state[CONSENT_KEYS[i]]) return true;
-  }
-  return false;
-}
-
-function appendParams(url, params) {
-  var u = url;
-  var sep = (u.indexOf('?') === -1) ? '?' : '&';
-  for (var k in params) {
-    if (!params.hasOwnProperty(k)) continue;
-    var v = params[k] == null ? '' : ('' + params[k]);
-    u += sep + encodeUriComponent(k) + '=' + encodeUriComponent(v);
-    sep = '&';
-  }
-  return u;
-}
-
-function finishAfterWait(ms) {
-  if (ms > 0) callLater(function () { data.gtmOnSuccess(); }, ms);
-  else data.gtmOnSuccess();
+function fail(message) {
+  log('Cybexo CMP: ' + message);
+  data.gtmOnFailure();
 }
 
 (function main() {
-  var settingsId = data.settingsId;
-  var developerId = 'dZTNmYW'; // locked per Google CMP partner requirement
-  var waitMs = normalizeWaitForUpdate(data.waitForUpdateMs);
-  var regionList = parseRegionCsv(data.regionList);
-  var fallbackDefaults = {
-    ad_storage: 'denied',
-    analytics_storage: 'denied',
-    ad_user_data: 'denied',
-    ad_personalization: 'denied'
-  };
-  var globalDefaults = parseConsentStateWithFallback(data.globalDefaultsJson, fallbackDefaults);
-  var regionDefaults = parseOptionalUpdate(data.regionDefaultsJson);
-
-  if (!settingsId) {
-    log('Cybexo Consent Template: Missing required Settings ID.');
-    data.gtmOnFailure();
+  var settingsId = typeof data.settingsId === 'string' ? data.settingsId.trim() : '';
+  var installed = templateStorage.getItem('settingsId');
+  // A repeated trigger must not replace defaults or reset an existing choice.
+  if (installed) {
+    if (installed !== settingsId) { fail('Only one Settings ID is supported per page.'); return; }
+    if (templateStorage.getItem('loadStatus') === 'failed') { fail('Loader previously failed on this page.'); return; }
+    data.gtmOnSuccess();
     return;
   }
-
-  // 1) developer_id for Consent Mode attribution
-  gtagSet('developer_id.' + developerId, true);
-
-  // 2) Defaults via GTM consent APIs (global + optional region override)
-  var globalState = {
-    ad_storage: globalDefaults.ad_storage,
-    analytics_storage: globalDefaults.analytics_storage,
-    ad_user_data: globalDefaults.ad_user_data,
-    ad_personalization: globalDefaults.ad_personalization,
-    wait_for_update: waitMs
-  };
-  setDefaultConsentState(globalState);
-
-  if (regionList.length && hasConsentKeys(regionDefaults)) {
-    var regionState = {
-      ad_storage: regionDefaults.ad_storage || globalDefaults.ad_storage,
-      analytics_storage: regionDefaults.analytics_storage || globalDefaults.analytics_storage,
-      ad_user_data: regionDefaults.ad_user_data || globalDefaults.ad_user_data,
-      ad_personalization: regionDefaults.ad_personalization || globalDefaults.ad_personalization,
-      wait_for_update: waitMs,
-      region: regionList
-    };
-    setDefaultConsentState(regionState);
+  var denied = state(null);
+  var wait = data.waitForUpdateMs * 1;
+  if (!(wait >= 500 && wait <= 10000)) wait = 500;
+  var defaults = settingsId ? state(data.globalDefaultsJson) : state(null);
+  defaults.wait_for_update = wait;
+  gtagSet('developer_id.' + DEVELOPER_ID, true);
+  setDefaultConsentState(defaults);
+  if (!settingsId) { fail('Missing required Settings ID. Defaults remain denied.'); return; }
+  var regionList = regions(data.regionList);
+  if (regionList.length) {
+    var regional = state(data.regionDefaultsJson, defaults);
+    regional.region = regionList;
+    regional.wait_for_update = wait;
+    setDefaultConsentState(regional);
   }
-
-  // 3) Load CMP loader from locked Cybexo endpoints.
-
-  // Pass values via query params so loader never falls back to UNKNOWN_SETTINGS_ID.
-  var loaderUrlWithParams = appendParams(CYBEXO_LOADER_URL, {
-    'data-settings-id': settingsId,
-    'data-cdn-url': CYBEXO_CDN_URL,
-    'data-assets-url': CYBEXO_ASSETS_URL,
-    'data-developer-id': developerId,
-    // Consent defaults are handled by GTM APIs in this template.
-    'data-consent-mode': 'off'
-  });
-
-  injectScript(
-    loaderUrlWithParams,
-    function () { finishAfterWait(waitMs); },
-    function (err) {
-      log('Cybexo Consent Template: Failed to load loader script: ' + loaderUrlWithParams + ' :: ' + err);
-      data.gtmOnSuccess(); // do not block container execution
-    }
-  );
+  // Installed before the asynchronous loader: no choice can outrun registration.
+  var registered = setInWindow(CALLBACK, function (signals) {
+    updateConsentState(state(signals));
+    return true;
+  }, false);
+  if (!registered) {
+    updateConsentState(denied);
+    fail('Consent callback could not be registered.');
+    return;
+  }
+  templateStorage.setItem('settingsId', settingsId);
+  var url = CYBEXO_LOADER_URL + '?data-settings-id=' + encodeUriComponent(settingsId)
+    + '&data-cdn-url=' + encodeUriComponent(CYBEXO_CDN_URL)
+    + '&data-assets-url=' + encodeUriComponent(CYBEXO_ASSETS_URL)
+    + '&data-developer-id=' + DEVELOPER_ID + '&data-consent-mode=off';
+  templateStorage.setItem('loadStatus', 'pending');
+  injectScript(url, function () {
+    templateStorage.setItem('loadStatus', 'loaded');
+    data.gtmOnSuccess();
+  }, function () {
+    templateStorage.setItem('loadStatus', 'failed');
+    updateConsentState(denied);
+    fail('Loader could not be loaded. Consent remains denied.');
+  }, 'cybexo-cmp-' + settingsId);
 })();
 
 
@@ -493,6 +396,79 @@ ___WEB_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_globals",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "keys",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "cybexoGtmConsentUpdate"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_template_storage",
+        "versionId": "1"
+      }
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
@@ -500,144 +476,36 @@ ___WEB_PERMISSIONS___
 ___TESTS___
 
 scenarios:
-- name: Uses locked developer ID and global consent defaults
+- name: Native updates handle grant withdrawal and partial payloads
   code: |-
-    runCode({
-      settingsId: 'demo-123',
-      globalDefaultsJson: '{"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}',
-      regionList: '',
-      regionDefaultsJson: '{"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}',
-      developerId: 'malicious_override',
-      loadCybexo: false,
-      loaderUrl: 'https://evil.example/loader.js',
-      cdnUrl: 'https://evil.example',
-      assetsUrl: 'https://evil.example',
-      waitForUpdateMs: 0,
-      gtmOnSuccess: function () {},
-      gtmOnFailure: function () {}
-    });
-
+    var callback;
+    mock('setInWindow', function (name, fn) { callback = fn; return true; });
+    mock('templateStorage', {getItem: function () {}, setItem: function () {}});
+    runCode({settingsId: 'fixture', globalDefaultsJson: '{}', regionList: '', waitForUpdateMs: 500});
+    callback({ad_storage:'granted', analytics_storage:'granted', ad_user_data:'granted', ad_personalization:'granted'});
+    assertApi('updateConsentState').wasCalledWith({ad_storage:'granted', analytics_storage:'granted', ad_user_data:'granted', ad_personalization:'granted'});
+    callback({analytics_storage:'denied'});
+    assertApi('updateConsentState').wasCalledWith({ad_storage:'denied', analytics_storage:'denied', ad_user_data:'denied', ad_personalization:'denied'});
     assertApi('gtagSet').wasCalledWith('developer_id.dZTNmYW', true);
-    assertApi('gtagSet').wasNotCalledWith('developer_id.malicious_override', true);
-    assertApi('setDefaultConsentState').wasCalledWith({
-      ad_storage: 'denied',
-      analytics_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-      wait_for_update: 500
-    });
-    assertApi('injectScript').wasCalled();
-
-- name: Applies region override defaults
+- name: Repeated execution preserves existing consent
   code: |-
-    runCode({
-      settingsId: 'demo-123',
-      globalDefaultsJson: '{"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}',
-      regionList: 'DE, FR',
-      regionDefaultsJson: '{"ad_storage":"granted","analytics_storage":"denied","ad_user_data":"granted","ad_personalization":"denied"}',
-      waitForUpdateMs: 750,
-      gtmOnSuccess: function () {},
-      gtmOnFailure: function () {}
-    });
-
-    assertApi('setDefaultConsentState').wasCalledWith({
-      ad_storage: 'denied',
-      analytics_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-      wait_for_update: 750
-    });
-    assertApi('setDefaultConsentState').wasCalledWith({
-      ad_storage: 'granted',
-      analytics_storage: 'denied',
-      ad_user_data: 'granted',
-      ad_personalization: 'denied',
-      wait_for_update: 750,
-      region: ['DE', 'FR']
-    });
-    assertApi('injectScript').wasCalled();
-
-- name: Enforces minimum wait_for_update of 500ms
-  code: |-
-    runCode({
-      settingsId: 'demo-123',
-      globalDefaultsJson: '{"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}',
-      regionList: '',
-      regionDefaultsJson: '',
-      waitForUpdateMs: 100,
-      gtmOnSuccess: function () {},
-      gtmOnFailure: function () {}
-    });
-
-    assertApi('setDefaultConsentState').wasCalledWith({
-      ad_storage: 'denied',
-      analytics_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-      wait_for_update: 500
-    });
-    assertApi('injectScript').wasCalled();
-
-- name: Uses wait_for_update fallback when invalid input is provided
-  code: |-
-    runCode({
-      settingsId: 'demo-123',
-      globalDefaultsJson: '{"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}',
-      regionList: '',
-      regionDefaultsJson: '',
-      waitForUpdateMs: 'abc',
-      gtmOnSuccess: function () {},
-      gtmOnFailure: function () {}
-    });
-
-    assertApi('setDefaultConsentState').wasCalledWith({
-      ad_storage: 'denied',
-      analytics_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-      wait_for_update: 500
-    });
-    assertApi('injectScript').wasCalled();
-
-- name: Fails fast when settings ID is missing
-  code: |-
-    var successCalled = false;
-    var failureCalled = false;
-    runCode({
-      settingsId: '',
-      globalDefaultsJson: '{"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}',
-      regionList: '',
-      regionDefaultsJson: '',
-      waitForUpdateMs: 0,
-      gtmOnSuccess: function () { successCalled = true; },
-      gtmOnFailure: function () { failureCalled = true; }
-    });
-
-    assertThat(failureCalled).isTrue();
-    assertThat(successCalled).isFalse();
+    mock('templateStorage', {getItem: function () { return 'fixture'; }});
+    runCode({settingsId: 'fixture'});
     assertApi('setDefaultConsentState').wasNotCalled();
     assertApi('injectScript').wasNotCalled();
-
-- name: Handles malformed JSON inputs with safe fallback
+- name: Missing identity still establishes denied defaults
   code: |-
-    runCode({
-      settingsId: 'demo-123',
-      globalDefaultsJson: '{"ad_storage":"denied"',
-      regionList: '',
-      regionDefaultsJson: '{"ad_storage":"granted"',
-      waitForUpdateMs: 0,
-      gtmOnSuccess: function () {},
-      gtmOnFailure: function () {}
-    });
-
-    assertApi('setDefaultConsentState').wasCalledWith({
-      ad_storage: 'denied',
-      analytics_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-      wait_for_update: 500
-    });
-    assertApi('injectScript').wasCalled();
+    mock('templateStorage', {getItem: function () {}});
+    runCode({settingsId: '', globalDefaultsJson:'{"ad_storage":"granted"}'});
+    assertApi('setDefaultConsentState').wasCalledWith({ad_storage:'denied', analytics_storage:'denied', ad_user_data:'denied', ad_personalization:'denied',wait_for_update:500});
+    assertApi('injectScript').wasNotCalled();
+- name: Loader failure revokes configured grants
+  code: |-
+    mock('templateStorage', {getItem: function () {}, setItem: function () {}});
+    mock('setInWindow', function () { return true; });
+    mock('injectScript', function (url, success, failure) { failure(); });
+    runCode({settingsId:'fixture',globalDefaultsJson:'{"ad_storage":"granted"}',regionList:''});
+    assertApi('updateConsentState').wasCalledWith({ad_storage:'denied', analytics_storage:'denied', ad_user_data:'denied', ad_personalization:'denied'});
 
 
 ___NOTES___

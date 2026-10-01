@@ -4,7 +4,7 @@ This repository contains the official **Google Tag Manager Community Template** 
 
 The template enables websites to:
 
-- Apply **Google Consent Mode v2** defaults via GTM consent APIs
+- Apply **Google Consent Mode v2** defaults and updates via GTM consent APIs
 - Configure defaults with **global** values plus optional **region override**
 - Set Google developer ID automatically (`developer_id.dZTNmYW`, non-editable)
 - Load the Cybexo Web CMP Loader from locked Cybexo endpoints
@@ -19,13 +19,16 @@ Repository identity: **CYBEXO-GTM-Consent-Template**.
 ## Current behavior
 
 - Uses `setDefaultConsentState` for consent defaults.
-- Enforces `wait_for_update` minimum of `500ms` for async-safe consent handling.
+- Accepts `wait_for_update` from 500–10000ms, defaulting invalid/out-of-range values to 500ms. This is a consent wait setting, not a tag-completion timer.
 - Supports required consent types:
   - `ad_storage`
   - `analytics_storage`
   - `ad_user_data`
   - `ad_personalization`
-- Injects Cybexo loader script on every run.
+- Registers a native `updateConsentState` callback before loading the CMP.
+- Injects one CMP loader per Settings ID/page; repeated execution cannot reset a choice.
+- Missing identity, malformed consent values, callback collision and script failure remain denied.
+- The matching CMP runtime must support `window.cybexoGtmConsentUpdate`; deploy the runtime and template as a qualified pair. This candidate is not yet released to the Gallery.
 - Passes the locked Cybexo Google developer ID to the loader as `data-developer-id`.
 - Passes `data-consent-mode=off` to avoid duplicate default handling by loader.
 
