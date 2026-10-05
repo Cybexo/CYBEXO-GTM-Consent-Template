@@ -3,6 +3,8 @@ documentation: "https://developer.cybexo.com"
 license: "Apache-2.0"
 
 versions:
+- sha: 6f5719dc3dec55fe5ee9fc800a8312238fe56aa0
+  changeNotes: "Requires actual CYB App IDs. Complete supported migration of legacy apps before updating; changing an ID prefix does not migrate configuration or consent history. Adds native Google consent updates and safer duplicate/failure handling. TCF installations require the synchronous page bootstrap before GTM. Keep Consent Mode enabled in the app configuration, then preview and publish the container."
 - sha: 048879a7e4227daa8af4ac9144919f461649503b
   changeNotes: "Rename template repository identity to CYBEXO-GTM-Consent-Template and align Cybexo runtime loader metadata."
 - sha: 6aad44caf75004122338f9981c5730807cfdb555
