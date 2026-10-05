@@ -1,69 +1,34 @@
-# CYBEXO-GTM-Consent-Template
+# CYBEXO GTM Consent Template
 
-This repository contains the official **Google Tag Manager Community Template** for the **Cybexo Consent Management Platform (CMP)**.
+Install CYBEXO CMP through the Google Tag Manager Community Template Gallery. The template sets Google Consent Mode defaults and updates the four Google consent values when a visitor makes or changes a choice.
 
-The template enables websites to:
+## Install
 
-- Apply **Google Consent Mode v2** defaults via GTM consent APIs
-- Configure defaults with **global** values plus optional **region override**
-- Set Google developer ID automatically (`developer_id.dZTNmYW`, non-editable)
-- Load the Cybexo Web CMP Loader from locked Cybexo endpoints
-- Ensure early execution during **Consent Initialization**
+1. Copy your **CYB App ID** (shown as Settings ID in the dashboard) from the CYBEXO dashboard and keep **Consent Mode enabled** for that app.
+2. For a TCF installation, paste [the synchronous TCF bootstrap block](publisher/tcf-bootstrap-inline.html) near the start of each page's `<head>`, **before the GTM container snippet and scripts that depend on TCF**. The block must execute without `async`, `defer` or `type="module"`. Follow your site's Content Security Policy, including its nonce or hash requirements.
+3. In GTM, open **Templates → Search Gallery**, find **Cybexo CMP**, and add the template. Create a tag using it and enter your **CYB App ID**.
+4. Keep the denied global defaults unless your consent configuration requires a different setting. Regional overrides are optional. See [field and region guidance](docs/installation.md#template-fields).
+5. Select **Consent Initialization – All Pages** as the tag's trigger.
+6. Check fresh visits, saved choices, acceptance, mixed choices and withdrawal in Tag Assistant before publishing the container. Confirm that the template version in your workspace is the version you intend to publish.
 
-This template is intended for GTM users who want to deploy Cybexo CMP without modifying website code directly.
+The TCF page block supplies the API while GTM and the CMP are loading. It does not load the banner or grant consent. A GTM-only installation cannot supply an API before GTM itself runs. Sites using TCF must include the page block even when the banner is installed through the Gallery.
 
-Repository identity: **CYBEXO-GTM-Consent-Template**.
+Use one CYBEXO consent installation per page. Do not add a second direct CMP loader or a separate `gtag('consent', ...)` setup alongside this template. See [complete installation and verification guidance](docs/installation.md).
 
----
+## Updating a legacy installation
 
-## Current behavior
+This template release accepts only `CYB-` App IDs. Before updating an installation with a legacy ID, complete a supported migration that preserves the app configuration and consent history, then copy the actual `CYB-` App ID from the dashboard. Do not change an ID prefix by hand: that does not migrate the app. Verify the migrated configuration, update the tag, and preview before publishing.
 
-- Uses `setDefaultConsentState` for consent defaults.
-- Enforces `wait_for_update` minimum of `500ms` for async-safe consent handling.
-- Supports required consent types:
-  - `ad_storage`
-  - `analytics_storage`
-  - `ad_user_data`
-  - `ad_personalization`
-- Injects Cybexo loader script on every run.
-- Passes the locked Cybexo Google developer ID to the loader as `data-developer-id`.
-- Passes `data-consent-mode=off` to avoid duplicate default handling by loader.
+## Behavior
 
----
+- Native GTM consent APIs manage `ad_storage`, `analytics_storage`, `ad_user_data` and `ad_personalization`.
+- The fixed Google developer ID is `dZTNmYW`.
+- The template loads the production CMP from CYBEXO's fixed endpoint and passes subsequent choices through the native GTM bridge.
+- `wait_for_update` accepts 500–10,000 milliseconds for asynchronous loading; invalid or out-of-range values use 500 milliseconds. It does not wait for a visitor indefinitely or prove that the CMP is ready.
+- Repeated tag execution shares the loader. Loader failure is reported as failure; script-load success alone does not certify CMP readiness.
 
-## Main fields
+## Support and license
 
-- `settingsId` (required)
-- `globalDefaultsJson`
-- `regionList` (optional CSV)
-- `regionDefaultsJson` (optional JSON)
-- `waitForUpdateMs` (minimum enforced at `500`)
+[Developer documentation](https://developer.cybexo.com/) · [CYBEXO](https://cybexo.com/)
 
----
-
-## Installation (via GTM Community Template Gallery)
-
-1. Open GTM → **Templates**
-2. Click **Search Gallery**
-3. Search for **Cybexo CMP**
-4. Add the template to your workspace
-5. Create a new Tag → Select **Cybexo CMP**
-6. Enter your **Settings ID**
-7. Keep defaults as needed (global + optional region override)
-8. Trigger it on **Consent Initialization – All Pages**
-9. Validate in Tag Assistant before publishing
-
----
-
-## Support
-
-For implementation support and documentation, visit:
-
-👉 https://developer.cybexo.com  
-👉 https://cybexo.com/
-
----
-
-## License
-
-This project is licensed under **Apache License 2.0**.
+This repository uses the [Apache License 2.0](LICENSE). The publisher bootstrap is the existing CYBEXO Web CMP artifact; its exact source and provenance are recorded in [publisher/README.md](publisher/README.md).
