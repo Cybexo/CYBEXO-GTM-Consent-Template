@@ -15,6 +15,8 @@ The TCF page block supplies the API while GTM and the CMP are loading. It does n
 
 Use one CYBEXO consent installation per page. Do not add a second direct CMP loader or a separate `gtag('consent', ...)` setup alongside this template. See [complete installation and verification guidance](docs/installation.md).
 
+The native GTM bridge is the single Google Consent Mode writer. The current CMP runtime disables automatic Google TCF inference for this integration while preserving the TCF API and disclosures. Remove any separate `window.gtag_enable_tcf_support = true` setting from a native GTM installation. When testing saved choices, also reopen settings and cancel an unsaved edit: Google consent values must remain unchanged.
+
 ## Updating a legacy installation
 
 This template release accepts only `CYB-` App IDs. Before updating an installation with a legacy ID, complete a supported migration that preserves the app configuration and consent history, then copy the actual `CYB-` App ID from the dashboard. Do not change an ID prefix by hand: that does not migrate the app. Verify the migrated configuration, update the tag, and preview before publishing.

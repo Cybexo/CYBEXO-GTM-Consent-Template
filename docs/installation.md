@@ -39,7 +39,7 @@ Denied global defaults:
 {"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied"}
 ```
 
-Configure the tag to fire on **Consent Initialization – All Pages**. GTM's built-in consent checks and any additional checks on other tags determine how those tags behave. A denied Consent Mode state is not a universal network blocker: configure and test Basic blocking separately when that is the desired installation. Keep controls for TCF advertising inference, native Consent Mode updates and tag blocking distinct.
+Configure the tag to fire on **Consent Initialization – All Pages**. GTM's built-in consent checks and any additional checks on other tags determine how those tags behave. A denied Consent Mode state is not a universal network blocker: configure and test Basic blocking separately when that is the desired installation. Native consent updates and tag blocking are separate controls.
 
 ## Migrating an existing installation
 
@@ -48,6 +48,10 @@ Migrate a legacy App ID before updating to this template release. Complete a sup
 ## Consent ownership
 
 This template sets native defaults and registers the native update callback before loading CYBEXO CMP. It loads the production endpoint with `data-consent-mode=off`, which disables the loader's separate `gtag` command path. The template's native bridge remains responsible for publishing validated choices to GTM. This flag does not mean that Google consent is disabled for this integration. Keep Consent Mode enabled in the app's dashboard configuration: the template does not override an app-level disabled setting.
+
+Web CMP 1.5.38 and later also expose `enableAdvertiserConsentMode: false` while the native GTM bridge is present, so automatic TCF inference cannot overwrite the bridge's saved values when the settings dialog opens. The standard TCF API, disclosures and lifecycle events remain available. Do not separately set `window.gtag_enable_tcf_support = true` on these pages; that would explicitly introduce a second Google consent writer. Direct Web installations retain their own inference configuration.
+
+After saving consent, reopen settings, change a switch without saving, and close the dialog. Check that all four Google values and the saved choice remain unchanged. Then save a deliberate change and verify that its corresponding values update.
 
 Do not install the direct Web consent-default snippet alongside the GTM template. It would introduce another consent owner. If you migrate from a direct installation, remove the old consent commands and direct loader while retaining the synchronous TCF block when TCF is used.
 
