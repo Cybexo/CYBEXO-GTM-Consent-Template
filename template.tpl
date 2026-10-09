@@ -141,8 +141,6 @@ function regions(csv) {
 }
 function deny() { updateConsentState(state(null)); }
 function stopObserving(owner) {
-  if (owner.timer !== undefined) callInWindow('clearTimeout', owner.timer);
-  owner.timer = undefined;
   if (getType(owner.unsubscribe) === 'function') owner.unsubscribe();
   owner.unsubscribe = undefined;
 }
@@ -183,18 +181,13 @@ function observe(owner) {
   if (owner.status === 'failed') return;
   // Read at application time, never reuse a captured event or delayed grant.
   var snapshot = readContract(owner);
+  owner.attempts++;
   if (!snapshot) {
-    if (owner.status === 'failed' || owner.timer !== undefined) return;
-    if (owner.attempts >= 60) { owner.contractState = 'ENGINE_NOT_AVAILABLE'; return; }
-    owner.attempts++;
-    owner.timer = callInWindow('setTimeout', function () {
-      owner.timer = undefined;
-      observe(owner);
-    }, 100);
+    // One attempt per real trigger. Browser timer globals are forbidden by GTM;
+    // never self-poll or claim readiness when this callback cannot see the API.
+    if (owner.status !== 'failed') owner.contractState = 'ENGINE_NOT_AVAILABLE';
     return;
   }
-  if (owner.timer !== undefined) callInWindow('clearTimeout', owner.timer);
-  owner.timer = undefined;
   if (getType(snapshot.revision) !== 'number' || snapshot.revision < owner.revision) return;
   owner.revision = snapshot.revision;
   owner.contractState = snapshot.state === 'error' ? 'ENGINE_ERROR'
@@ -699,84 +692,6 @@ ___WEB_PERMISSIONS___
                   {
                     "type": 1,
                     "string": "CybexoConsentEngine.subscribe"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "setTimeout"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "clearTimeout"
                   },
                   {
                     "type": 8,

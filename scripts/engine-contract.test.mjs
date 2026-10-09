@@ -26,8 +26,8 @@ function snapshot(overrides = {}) {
   };
 }
 function harness({existingEngine, subscriptionUnavailable = false, nativeThrows = false, installerOwner} = {}) {
-  const calls = [], store = new Map(), globals = {}, loads = [], later = [], timers = new Map(), listeners = new Set();
-  let engine = existingEngine, timerId = 0, tagId = 0, current;
+  const calls = [], store = new Map(), globals = {}, loads = [], later = [], listeners = new Set();
+  let engine = existingEngine, tagId = 0, current;
   const apis = {
     logToConsole: message => calls.push(['log', message]),
     injectScript: (url, success, failure, token) => { loads.push({url, success, failure, token}); },
@@ -42,8 +42,7 @@ function harness({existingEngine, subscriptionUnavailable = false, nativeThrows 
     copyFromWindow: path => { if (path === 'cybexoCmpInstallationV1') return clone(installerOwner); assert.equal(path, 'CybexoConsentEngine.contractVersion'); return engine?.contractVersion; },
     callInWindow: (path, ...args) => {
       calls.push(['execute', path]);
-      if (path === 'setTimeout') { assert.equal(args[1], 100); const id = ++timerId; timers.set(id, args[0]); return id; }
-      if (path === 'clearTimeout') { timers.delete(args[0]); return; }
+      assert.ok(!['setTimeout','clearTimeout','setInterval','clearInterval'].includes(path), 'GTM forbids predefined Window timer keys');
       if (path === 'CybexoConsentEngine.getSnapshot') return engine?.getSnapshot();
       if (path === 'CybexoConsentEngine.subscribe') return engine?.subscribe(args[0]);
       assert.fail('undeclared window API: ' + path);
@@ -81,21 +80,20 @@ function harness({existingEngine, subscriptionUnavailable = false, nativeThrows 
       later.shift()();
     }
   }
-  function tick() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(callback => callback()); }
-  return {calls, loads, later, timers, listeners, run, install, publish, flush, tick, globals, store,
+  return {calls, loads, later, listeners, run, install, publish, flush, globals, store,
     owner: () => store.get('cybexoConsentOwner'), updates: () => calls.filter(call => call[0] === 'update'),
     native: value => globals.cybexoGtmConsentUpdate(value),
     ready: (value = snapshot()) => { run(); install(value); loads[0].success(); flush(); }};
 }
 
-test('download success is not readiness; late contract attaches once through supported sandbox APIs', () => {
+test('download success is not readiness; late native transport attaches once through supported sandbox APIs', () => {
   const h = harness(); h.run(); h.loads[0].success(); h.flush();
-  assert.equal(h.owner().status, 'loaded'); assert.equal(h.owner().contractState, 'ENGINE_PENDING');
-  assert.equal(h.timers.size, 1); assert.equal(h.listeners.size, 0);
-  h.tick(); h.install(snapshot({state: 'pending', pending: true})); h.tick(); h.flush();
-  assert.equal(h.owner().contractState, 'ENGINE_PENDING'); assert.equal(h.listeners.size, 1); assert.equal(h.timers.size, 0);
+  assert.equal(h.owner().status, 'loaded'); assert.equal(h.owner().contractState, 'ENGINE_NOT_AVAILABLE');
+  assert.equal(h.owner().attempts, 1); assert.equal(h.later.length, 0); assert.equal(h.listeners.size, 0);
+  h.install(snapshot({state: 'pending', pending: true})); h.native(denied); h.flush();
+  assert.equal(h.owner().contractState, 'ENGINE_PENDING'); assert.equal(h.listeners.size, 1);
   h.publish(snapshot({revision: 2}), 'ready'); h.flush();
-  assert.equal(h.owner().contractState, 'ENGINE_READY'); assert.deepEqual(h.updates(), []);
+  assert.equal(h.owner().contractState, 'ENGINE_READY'); assert.deepEqual(h.updates(), [['update', denied]]);
 });
 
 test('delayed observation rereads withdrawal; it never replays captured grant or becomes a second writer', () => {
@@ -163,7 +161,7 @@ for (const field of ['appId', 'engineRelease', 'engineVersion', 'buildId', 'inst
     const h = harness(); h.ready();
     h.publish(snapshot({revision: 2, identity: {...snapshot().identity, [field]: 'wrong'}})); h.flush();
     assert.equal(h.owner().contractState, 'ENGINE_IDENTITY_MISMATCH'); assert.equal(h.owner().status, 'failed');
-    assert.equal(h.listeners.size, 0); assert.equal(h.timers.size, 0);
+    assert.equal(h.listeners.size, 0);
     assert.equal(h.native(granted), false); assert.deepEqual(h.updates(), [['update', denied]]);
   });
 }
@@ -214,19 +212,18 @@ test('conflicting release cannot join the current template owner', () => {
   assert.equal(h.native(granted), false); assert.deepEqual(h.updates(), [['update', denied]]);
 });
 
-test('missing API polling is bounded; later legitimate transport can attach to latest state', () => {
+test('missing API does not self-poll; later legitimate transport attaches to latest state', () => {
   const h = harness(); h.run(); h.loads[0].success(); h.flush();
-  for (let i = 0; i < 65; i++) h.tick();
-  assert.equal(h.owner().attempts, 60); assert.equal(h.timers.size, 0);
+  assert.equal(h.owner().attempts, 1); assert.equal(h.later.length, 0);
   assert.equal(h.owner().contractState, 'ENGINE_NOT_AVAILABLE'); assert.deepEqual(h.updates(), []);
   h.install(snapshot({revision: 20})); h.native(denied); h.flush();
   assert.equal(h.owner().contractState, 'ENGINE_READY'); assert.equal(h.owner().snapshot.revision, 20);
   assert.equal(h.listeners.size, 1);
 });
 
-test('failed owner clears pending timer; retained timer callback is harmless', () => {
-  const h = harness(); h.run(); h.loads[0].success(); h.flush(); const stale = [...h.timers.values()][0];
-  h.run({settingsId: 'CYB-other00001'}); assert.equal(h.timers.size, 0);
+test('failed owner makes a retained coalesced callback harmless', () => {
+  const h = harness(); h.run(); h.loads[0].success(); const stale = h.later[0];
+  h.run({settingsId: 'CYB-other00001'});
   h.install(); stale(); h.flush(); assert.equal(h.listeners.size, 0);
   assert.equal(h.native(granted), false); assert.deepEqual(h.updates(), [['update', denied]]);
 });
@@ -247,7 +244,6 @@ test('window capabilities are explicit and read-only except for the one native c
     ['CybexoConsentEngine.contractVersion', true, false, false],
     ['CybexoConsentEngine.getSnapshot', false, false, true],
     ['CybexoConsentEngine.subscribe', false, false, true],
-    ['setTimeout', false, false, true], ['clearTimeout', false, false, true],
     ['cybexoCmpInstallationV1', true, false, false]
   ]);
 });
@@ -268,4 +264,23 @@ test('excluded Drupal page still reserves its existing denied defaults even with
   const h = harness({installerOwner: {appId: '', platform: 'drupal', release, googleOwner: 'direct'}}); h.run();
   assert.equal(h.loads.length, 0); assert.deepEqual(h.updates(), []);
   assert.ok(!h.calls.some(call => ['default', 'developer'].includes(call[0])));
+});
+
+test('provider-forbidden predefined Window timer permissions and calls are absent', () => {
+  const permissions = JSON.parse(section('WEB_PERMISSIONS'));
+  const entries = permissions.find(p => p.instance.key.publicId === 'access_globals').instance.param[0].value.listItem;
+  const forbidden = ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame'];
+  assert.ok(entries.every(entry => !forbidden.includes(entry.mapValue[0].string)));
+  assert.doesNotMatch(code, /callInWindow\(['"](?:setTimeout|clearTimeout|setInterval|clearInterval|requestAnimationFrame|cancelAnimationFrame)['"]/);
+  const h = harness(); h.run(); h.loads[0].success(); h.flush();
+  assert.equal(h.owner().attempts, 1); assert.equal(h.later.length, 0);
+});
+
+test('Google-off API arriving after the sole load observation remains honestly unavailable without writes', () => {
+  const h = harness(); h.run(); h.loads[0].success(); h.flush();
+  h.install(snapshot({identity: {...snapshot().identity, googleOwner: 'none'}, google: {enabled: false, owner: 'none', signals: granted}}));
+  h.flush();
+  assert.equal(h.owner().contractState, 'ENGINE_NOT_AVAILABLE'); assert.equal(h.listeners.size, 0);
+  assert.equal(h.calls.filter(call => call[0] === 'default').length, 1); assert.deepEqual(h.updates(), []);
+  assert.equal(h.later.length, 0);
 });

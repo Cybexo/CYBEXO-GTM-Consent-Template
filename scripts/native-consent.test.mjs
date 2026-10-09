@@ -104,6 +104,6 @@ test('fields and permissions expose only necessary endpoints and APIs',()=>{
  const permissions=JSON.parse(part('WEB_PERMISSIONS'));const byId=id=>permissions.find(p=>p.instance.key.publicId===id).instance;
  assert.deepEqual(byId('inject_script').param[0].value.listItem.map(x=>x.string),['https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js*']);
  for(const item of byId('access_consent').param[0].value.listItem)assert.deepEqual(item.mapValue.slice(1).map(x=>x.boolean),[false,true]);
- const access=byId('access_globals').param[0].value.listItem;assert.equal(access.length,7);assert.equal(access[0].mapValue[0].string,'cybexoGtmConsentUpdate');assert.deepEqual(access[0].mapValue.slice(1).map(x=>x.boolean),[true,true,false]);
+ const access=byId('access_globals').param[0].value.listItem;assert.equal(access.length,5);assert.equal(access[0].mapValue[0].string,'cybexoGtmConsentUpdate');assert.deepEqual(access[0].mapValue.slice(1).map(x=>x.boolean),[true,true,false]);
  assert.ok(code.includes("require('callInWindow')"));assert.ok(code.includes("require('callLater')"));assert.ok(code.includes("require('updateConsentState')"));
 });
