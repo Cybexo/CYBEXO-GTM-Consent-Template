@@ -173,7 +173,7 @@ function installationContext(settingsId) {
     if (getType(declared) !== 'object' || declared.contractVersion !== 1) return undefined;
     if (declared.appId !== undefined && declared.appId !== '' && declared.appId !== settingsId) return undefined;
     if (declared.hostPlatform !== undefined && declared.hostPlatform !== '' &&
-        declared.hostPlatform !== 'direct' && declared.hostPlatform !== 'wordpress') return undefined;
+        declared.hostPlatform !== 'direct' && declared.hostPlatform !== 'wordpress' && declared.hostPlatform !== 'shopify') return undefined;
     if (declared.installer !== undefined && declared.installer !== '' && declared.installer !== 'gtm') return undefined;
     if (declared.googleOwner !== undefined && declared.googleOwner !== '' && declared.googleOwner !== 'native-gtm') return undefined;
     if (declared.hostPlatform) host = declared.hostPlatform;
@@ -192,7 +192,7 @@ function installationContext(settingsId) {
     if (getType(bootstrap) !== 'object' || bootstrap.appId !== settingsId ||
         bootstrap.installer !== 'gtm' || bootstrap.googleOwner !== 'native-gtm' ||
         (bootstrap.state !== 'waiting' && bootstrap.state !== 'started') ||
-        (bootstrap.hostPlatform !== 'direct' && bootstrap.hostPlatform !== 'wordpress')) return undefined;
+        (bootstrap.hostPlatform !== 'direct' && bootstrap.hostPlatform !== 'wordpress' && bootstrap.hostPlatform !== 'shopify')) return undefined;
     if ((declared && declared.hostPlatform && declared.hostPlatform !== bootstrap.hostPlatform) ||
         (wp === 'gtm' && bootstrap.hostPlatform !== 'wordpress')) return undefined;
     host = bootstrap.hostPlatform;

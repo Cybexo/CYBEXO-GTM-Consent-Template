@@ -327,7 +327,6 @@ for (const options of [
   {wpInstaller: 'wordpress'}, {wpInstaller: 'direct'},
   {context: {contractVersion: 2}}, {context: null},
   {context: {contractVersion: 1, appId: 'CYB-other00001'}},
-  {context: {contractVersion: 1, hostPlatform: 'shopify'}},
   {context: {contractVersion: 1, hostPlatform: 'drupal'}},
   {context: {contractVersion: 1, installer: 'direct'}},
   {context: {contractVersion: 1, googleOwner: 'direct'}},
@@ -354,7 +353,7 @@ test('WordPress compatibility preserves older v1 snapshots without new host fiel
 
 
 const reservation={appId:'CYB-fixture001',hostPlatform:'direct',installer:'gtm',googleOwner:'native-gtm',state:'waiting'};
-for(const hostPlatform of ['direct','wordpress'])test('matching early '+hostPlatform+' reservation resumes once after native defaults and callback without injection',()=>{
+for(const hostPlatform of ['direct','wordpress','shopify'])test('matching early '+hostPlatform+' reservation resumes once after native defaults and callback without injection',()=>{
  let h,resumes=0;
  h=harness({bootstrap:{...reservation,hostPlatform},resume:appId=>{
   resumes++;assert.equal(appId,'CYB-fixture001');assert.equal(h.calls.filter(call=>call[0]==='default').length,1);assert.equal(typeof h.globals.cybexoGtmConsentUpdate,'function');return true;
@@ -362,7 +361,7 @@ for(const hostPlatform of ['direct','wordpress'])test('matching early '+hostPlat
  h.run();h.flush();h.run();assert.equal(resumes,1);assert.equal(h.loads.length,0);assert.equal(h.owner().hostPlatform,hostPlatform);assert.equal(h.owner().status,'loaded');
  assert.deepEqual(h.calls.filter(call=>call[0]==='success'),[['success',1],['success',2]]);assert.deepEqual(h.updates(),[]);
 });
-for(const bootstrap of [null,{...reservation,appId:'CYB-other00001'},{...reservation,hostPlatform:'shopify'},{...reservation,installer:'direct'},{...reservation,googleOwner:'direct'},{...reservation,state:'unknown'}])test('invalid early reservation rejects before native defaults: '+JSON.stringify(bootstrap),()=>{
+for(const bootstrap of [null,{...reservation,appId:'CYB-other00001'},{...reservation,hostPlatform:'drupal'},{...reservation,installer:'direct'},{...reservation,googleOwner:'direct'},{...reservation,state:'unknown'}])test('invalid early reservation rejects before native defaults: '+JSON.stringify(bootstrap),()=>{
  const h=harness({bootstrap,resume:()=>assert.fail('must not resume')});h.run();assert.equal(h.loads.length,0);assert.equal(h.globals.cybexoGtmConsentUpdate,undefined);assert.ok(!h.calls.some(call=>['default','developer','update'].includes(call[0])));assert.deepEqual(h.calls.at(-1),['failure',1]);
 });
 for(const options of [{wpInstaller:'gtm'},{context:{contractVersion:1,hostPlatform:'wordpress',installer:'gtm',googleOwner:'native-gtm'}}])test('early host conflicts fail before defaults '+JSON.stringify(options),()=>{
@@ -370,4 +369,31 @@ for(const options of [{wpInstaller:'gtm'},{context:{contractVersion:1,hostPlatfo
 });
 for(const resume of [undefined,()=>false])test('failed or missing resume never injects a second loader or falls back to direct: '+String(resume),()=>{
  const h=harness({bootstrap:reservation,resume});h.run();assert.equal(h.loads.length,0);assert.equal(h.owner().status,'failed');assert.deepEqual(h.updates(),[['update',denied]]);assert.equal(h.native(granted),false);
+});
+
+
+test('Shopify declaration retains its host with one native GTM owner and independently mapped signals', () => {
+  const h = harness({context: {contractVersion: 1, appId: 'CYB-fixture001', hostPlatform: 'shopify', installer: 'gtm', googleOwner: 'native-gtm'},
+    installerOwner: {appId: 'CYB-fixture001', platform: 'gtm', googleOwner: 'native-gtm'}});
+  h.run();
+  const url = new URL(h.loads[0].url);
+  assert.equal(url.pathname, '/loader.js');
+  assert.equal(url.searchParams.get('data-host-platform'), 'shopify');
+  assert.equal(url.searchParams.get('data-installer'), 'gtm');
+  assert.equal(url.searchParams.get('data-google-owner'), 'native-gtm');
+  assert.equal(url.searchParams.has('data-engine-release'), false);
+  assert.deepEqual(h.calls.filter(call => call[0] === 'default'), [['default', {...denied, wait_for_update: 500}]]);
+  h.install(snapshot({identity: {...snapshot().identity, hostPlatform: 'shopify', installer: 'gtm'}}));
+  h.loads[0].success(); h.flush();
+  const mixed = {...denied, analytics_storage: 'granted', ad_storage: 'granted'};
+  for (const signals of [mixed, granted, denied]) assert.equal(h.native(signals), true);
+  assert.deepEqual(h.updates(), [['update', mixed], ['update', granted], ['update', denied]]);
+  h.run(); assert.equal(h.loads.length, 1); assert.equal(h.calls.filter(call => call[0] === 'default').length, 1);
+  assert.equal(h.owner().contractState, 'ENGINE_READY');
+});
+
+for (const owner of ['direct', 'none']) test('Shopify explicit competing Google owner is rejected before native effects: ' + owner, () => {
+  const h = harness({context: {contractVersion: 1, appId: 'CYB-fixture001', hostPlatform: 'shopify', installer: 'gtm', googleOwner: owner}});
+  h.run(); assert.equal(h.loads.length, 0); assert.equal(h.globals.cybexoGtmConsentUpdate, undefined);
+  assert.ok(!h.calls.some(call => ['default', 'developer', 'update'].includes(call[0])));
 });

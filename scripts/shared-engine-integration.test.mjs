@@ -22,9 +22,9 @@ else {
  const template=readFileSync(new URL('../template.tpl',import.meta.url),'utf8').split('___SANDBOXED_JS_FOR_WEB_TEMPLATE___')[1].split('\n___')[0];
  const plain=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
  async function until(check){for(let i=0;i<300;i++){if(check())return;await new Promise(r=>setTimeout(r,5));}assert.ok(check(),'source runtime reached expected state');}
- function page({wordpress=false,saved,early=false}={}){
+ function page({host='direct',saved,early=false}={}){
   const dom=new JSDOM('<html><body></body></html>',{url:'https://shared-gtm-fixture.invalid/',runScripts:'outside-only'}),w=dom.window;
-  const defaults=[],updates=[],direct=[],loads=[],requests=[],later=[],store=new Map();let release;
+  const defaults=[],updates=[],direct=[],loads=[],requests=[],later=[],shopifyReady=[],store=new Map();let release;
   const configGate=new Promise(r=>{release=r;});
   w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;w.Response=Response;Object.defineProperty(w,'crypto',{value:webcrypto});
   Object.defineProperty(w,'event',{get:()=>undefined,configurable:true});
@@ -32,7 +32,13 @@ else {
   w.requestAnimationFrame=f=>w.setTimeout(f,0);w.cancelAnimationFrame=id=>w.clearTimeout(id);
   w.__nxgLoaderCssText=':host{display:block}';w.dataLayer=[];w.gtag=(...args)=>direct.push(args);
   w.console={...console,log(){},info(){},debug(){},warn(){},group(){},groupCollapsed(){},groupEnd(){}};
-  if(wordpress)w.__cybexoWpEngineInstaller='gtm';
+  if(host==='wordpress')w.__cybexoWpEngineInstaller='gtm';
+  if(host==='shopify'){
+   w.__CYBEXO_SHOPIFY_CP_BRIDGE_BOUND__=true;
+   w.cybexoCmpContextV1={contractVersion:1,appId:'CYB-fixture001',hostPlatform:'shopify',installer:'gtm',googleOwner:'native-gtm'};
+   w.cybexoCmpInstallationV1={appId:'CYB-fixture001',platform:'gtm',googleOwner:'native-gtm'};
+  }
+  w.addEventListener('cybexo:shopify:engine-loaded',()=>shopifyReady.push(plain(w.CybexoConsentEngine.getSnapshot())));
   for(const [key,value]of Object.entries(saved?.storage||{}))w.localStorage.setItem(key,value);
   for(const cookie of saved?.cookies?.split('; ')||[])if(cookie)w.document.cookie=cookie;
   w.fetch=async(url,init)=>{
@@ -53,32 +59,37 @@ else {
   };
   function run(){vm.runInNewContext(template,{require:name=>apis[name],data:{settingsId:'CYB-fixture001',gtmOnSuccess(){},gtmOnFailure:()=>assert.fail('template rejected actual shared engine')}});}
   function load(){const el=w.document.createElement('script');el.src=early?'https://cmp.cybexo.com/loader.js?data-gtm-bootstrap=on':loads[0].url;
-   if(early){el.id='cybexo-cmp';el.setAttribute('data-settings-id','CYB-fixture001');el.setAttribute('data-gtm-bootstrap','on');if(wordpress)el.setAttribute('data-host-platform','wordpress');}
+   if(early){el.id='cybexo-cmp';el.setAttribute('data-settings-id','CYB-fixture001');el.setAttribute('data-gtm-bootstrap','on');if(host!=='direct')el.setAttribute('data-host-platform',host);}
    el.setAttribute('data-consent-records','off');el.setAttribute('data-interaction-analytics','off');Object.defineProperty(w.document,'currentScript',{value:el,configurable:true});w.eval(engineCode);Object.defineProperty(w.document,'currentScript',{value:null,configurable:true});if(!early)loads[0].success();}
   function flush(){for(let i=0;later.length;i++){assert.ok(i<100,'no self-polling');later.shift()();}}
-  return {w,dom,defaults,updates,direct,loads,requests,run,load,flush,release,owner:()=>store.get('cybexoConsentOwner'),saved:()=>({storage:Object.fromEntries(Object.keys(w.localStorage).map(key=>[key,w.localStorage.getItem(key)])),cookies:w.document.cookie})};
+  return {w,dom,defaults,updates,direct,loads,requests,shopifyReady,run,load,flush,release,owner:()=>store.get('cybexoConsentOwner'),saved:()=>({storage:Object.fromEntries(Object.keys(w.localStorage).map(key=>[key,w.localStorage.getItem(key)])),cookies:w.document.cookie})};
  }
- for(const early of [false,true])for(const wordpress of [false,true])test(`actual shared loader + sandbox: ${wordpress?'WordPress':'Direct'} host, ${early?'early handoff':'template injection'} has one native owner through choice, cancel, restore and withdrawal`,async()=>{
-  let p=page({wordpress,early});
+ for(const early of [false,true])for(const host of ['direct','wordpress','shopify'])test(`actual shared loader + sandbox: ${host} host, ${early?'early handoff':'template injection'} has one native owner through choice, cancel, restore and withdrawal`,async()=>{
+  let p=page({host,early});
   try{
    if(early){p.load();assert.equal(p.requests.length,0);assert.equal(p.defaults.length,0);assert.equal(p.direct.length,0);assert.equal(typeof p.w.__tcfapi,'function');assert.equal(p.w.CybexoConsentEngine,undefined);}
    p.run();assert.equal(p.defaults.length,1);assert.equal(p.loads.length,early?0:1);if(!early)p.load();p.flush();
    assert.equal(typeof p.w.__tcfapi,'function');assert.equal(p.w.CybexoConsentEngine,undefined);assert.equal(p.direct.length,0);
-   assert.equal(p.owner().contractState,'ENGINE_NOT_AVAILABLE');p.release();
+   assert.equal(p.owner().contractState,'ENGINE_NOT_AVAILABLE');assert.equal(p.shopifyReady.length,0);p.release();
    await until(()=>p.w.CybexoConsentEngine?.getSnapshot().state==='ready');p.flush();
    assert.equal(p.owner().contractState,'ENGINE_READY');
    let snapshot=p.w.CybexoConsentEngine.getSnapshot();
-   assert.equal(snapshot.identity.hostPlatform,wordpress?'wordpress':'direct');assert.equal(snapshot.identity.installer,'gtm');assert.equal(snapshot.identity.installationPlatform,'gtm');
+   assert.equal(snapshot.identity.hostPlatform,host);assert.equal(snapshot.identity.installer,'gtm');assert.equal(snapshot.identity.installationPlatform,'gtm');
    assert.equal(snapshot.identity.googleOwner,'native-gtm');assert.equal(p.owner().snapshot.buildId,expectedBuild);
+   assert.equal(p.shopifyReady.length,host==='shopify'?1:0);
+   if(host==='shopify'){assert.equal(p.shopifyReady[0].state,'ready');assert.equal(p.shopifyReady[0].decisionMade,false);assert.equal(p.shopifyReady[0].decisionRevision,0);}
+   assert.deepEqual(Object.fromEntries(Object.entries(p.defaults[0]).filter(([key])=>key!=='wait_for_update')),{ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
    await p.w.handleCMPAction('accept');p.flush();
    snapshot=p.w.CybexoConsentEngine.getSnapshot();assert.equal(snapshot.analytics.effective,true);assert.deepEqual(p.updates.at(-1),plain(snapshot.google.signals));
    const saved=p.saved(),tc=snapshot.tcf.tcString,writes=p.updates.length;
    for(const visible of [true,false])p.w.dispatchEvent(new p.w.CustomEvent('cybexo:consent-ui-visibility',{detail:{visible}}));p.flush();
    assert.equal(p.updates.length,writes);assert.equal(p.w.CybexoConsentEngine.getSnapshot().tcf.tcString,tc);assert.deepEqual(p.saved(),saved);
    p.run();assert.equal(p.defaults.length,1);assert.equal(p.loads.length,early?0:1);assert.equal(p.direct.length,0);
-   p.dom.window.close();p=page({wordpress,saved,early});if(early)p.load();p.run();if(!early)p.load();p.release();
+   p.dom.window.close();p=page({host,saved,early});if(early)p.load();p.run();if(!early)p.load();p.release();
    await until(()=>p.w.CybexoConsentEngine?.getSnapshot().state==='ready');p.flush();
    snapshot=p.w.CybexoConsentEngine.getSnapshot();assert.equal(snapshot.lastDecisionAction,'restore');assert.equal(snapshot.tcf.tcString,tc);assert.deepEqual(p.saved(),saved);assert.equal(p.owner().snapshot.lastDecisionAction,'restore');
+   assert.equal(p.shopifyReady.length,host==='shopify'?1:0);
+   if(host==='shopify'){assert.equal(p.shopifyReady[0].state,'ready');assert.equal(p.shopifyReady[0].lastDecisionAction,'restore');assert.equal(p.shopifyReady[0].decisionRevision,0);}
    await p.w.handleCMPAction('reject');p.flush();snapshot=p.w.CybexoConsentEngine.getSnapshot();
    assert.equal(snapshot.analytics.effective,false);assert.ok(Object.values(p.updates.at(-1)).every(v=>v==='denied'));assert.equal(p.owner().snapshot.lastDecisionAction,'reject-all');
    assert.equal(p.defaults.length,1);assert.equal(p.direct.length,0);
