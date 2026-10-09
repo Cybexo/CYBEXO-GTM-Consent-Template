@@ -1,17 +1,19 @@
 # CYBEXO GTM Consent Template
 
+This is an unpublished shared-engine recovery candidate. Import, site qualification and Gallery/container promotion remain separate gates.
+
 Install CYBEXO CMP through the Google Tag Manager Community Template Gallery. The template sets Google Consent Mode defaults and updates the four Google consent values when a visitor makes or changes a choice.
 
 ## Install
 
 1. Copy your **CYB App ID** (shown as Settings ID in the dashboard) from the CYBEXO dashboard and keep **Consent Mode enabled** for that app.
-2. For a TCF installation, paste [the synchronous TCF bootstrap block](publisher/tcf-bootstrap-inline.html) near the start of each page's `<head>`, **before the GTM container snippet and scripts that depend on TCF**. The block must execute without `async`, `defer` or `type="module"`. Follow your site's Content Security Policy, including its nonce or hash requirements.
+2. Check the [early TCF startup requirement](docs/installation.md#tcf-page-setup) before adopting this candidate on a TCF site.
 3. In GTM, open **Templates → Search Gallery**, find **Cybexo CMP**, and add the template. Create a tag using it and enter your **CYB App ID**.
 4. Keep the denied global defaults unless your consent configuration requires a different setting. Regional overrides are optional. See [field and region guidance](docs/installation.md#template-fields).
 5. Select **Consent Initialization – All Pages** as the tag's trigger.
 6. Check fresh visits, saved choices, acceptance, mixed choices and withdrawal in Tag Assistant before publishing the container. Confirm that the template version in your workspace is the version you intend to publish.
 
-The TCF page block supplies the API while GTM and the CMP are loading. It does not load the banner or grant consent. A GTM-only installation cannot supply an API before GTM itself runs. Sites using TCF must include the page block even when the banner is installed through the Gallery.
+A GTM-only installation cannot expose TCF before GTM and its injected loader execute. The early native reservation uses that same public loader with `data-gtm-bootstrap="on"`. Its local component contract is implemented; delivery, GTM compilation and site qualification remain required before publication.
 
 Use one CYBEXO consent installation per page. Do not add a second direct CMP loader or a separate `gtag('consent', ...)` setup alongside this template. See [complete installation and verification guidance](docs/installation.md).
 
@@ -25,7 +27,7 @@ This template release accepts only `CYB-` App IDs. Before updating an installati
 
 - Native GTM consent APIs manage `ad_storage`, `analytics_storage`, `ad_user_data` and `ad_personalization`.
 - The fixed Google developer ID is `dZTNmYW`.
-- The template selects immutable engine release `1.5.41-dc8923e48269` and passes subsequent choices through the native GTM bridge. The matching bootstrap and release descriptor are in `publisher/`.
+- The template uses `https://cmp.cybexo.com/loader.js`, shared by every platform, and passes choices through the native GTM bridge. App, contract, installer and Google owner determine compatibility; build numbers are diagnostic.
 - `wait_for_update` accepts 500–10,000 milliseconds for asynchronous loading; invalid or out-of-range values use 500 milliseconds. It does not wait for a visitor indefinitely or prove that the CMP is ready.
 - Repeated tag execution shares the loader. Loader failure is reported as failure; script-load success alone does not certify CMP readiness.
 
@@ -37,6 +39,6 @@ This repository uses the [Apache License 2.0](LICENSE). The publisher bootstrap 
 
 ## Runtime update delivery
 
-This source candidate selects engine release `1.5.41-dc8923e48269` through an immutable loader path. The template identifies itself as `gtm-v1.0.0` using engine contract v1. It observes engine readiness and choices through supported sandbox APIs; the native callback remains the only Google update writer. Repository changes do not update an installed Gallery template or container.
+This source candidate uses the single public loader and engine contract v1. Its connector marker `gtm-v1.0.0` is diagnostic; it does not select an engine release. It observes engine readiness and choices through supported sandbox APIs; the native callback remains the only Google update writer. Repository changes do not update an installed Gallery template or container.
 
-When this template version becomes available, review the Gallery update, preview the existing consent tag and publish the container. Keep the same App ID, tag settings and consent initialization trigger. Saved choices retain the engine's existing validation rules; already-open pages take up the selection on a normal navigation or reload. See [release pairing and maintainer checks](docs/engine-release-adoption.md).
+When this template version becomes available, review the Gallery update, preview the existing consent tag and publish the container. Keep the same App ID, tag settings and consent initialization trigger. Saved choices retain the engine's existing validation rules. A shared engine release reaches a new page load under the managed delivery policy; installed template updates still require Gallery review and container publication. See [shared delivery and maintainer checks](docs/engine-release-adoption.md).

@@ -92,10 +92,8 @@ const getType = require('getType');
 const encodeUriComponent = require('encodeUriComponent');
 
 var KEYS = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
-var ENGINE_RELEASE = '1.5.41-dc8923e48269';
-var ENGINE_BUILD = 'production.20261009.070006.runlocal.04a91543';
 var ADAPTER_VERSION = 'gtm-v1.0.0';
-var ASSETS = 'https://cmp.cybexo.com/releases/' + ENGINE_RELEASE;
+var ASSETS = 'https://cmp.cybexo.com';
 var LOADER = ASSETS + '/loader.js';
 var CDN = 'https://edge.cybexo.com';
 var DEVELOPER_ID = 'dZTNmYW';
@@ -156,10 +154,50 @@ function matchesIdentity(snapshot, owner) {
   var identity = snapshot && snapshot.identity;
   return snapshot && snapshot.schema === 'cybexo.consent.v1' && identity &&
     identity.contractVersion === 1 && identity.appId === owner.settingsId &&
-    identity.engineRelease === ENGINE_RELEASE && identity.engineVersion === '1.5.41' && identity.buildId === ENGINE_BUILD &&
-    identity.installationPlatform === 'gtm' && identity.adapterVersion === ADAPTER_VERSION &&
+    identity.installationPlatform === 'gtm' &&
+    (identity.installer === undefined || identity.installer === 'gtm') &&
+    (identity.hostPlatform === undefined || identity.hostPlatform === owner.hostPlatform) &&
     ((identity.googleOwner === 'native-gtm' && snapshot.google && snapshot.google.owner === 'native-gtm') ||
       (identity.googleOwner === 'none' && snapshot.google && snapshot.google.owner === 'none' && snapshot.google.enabled === false));
+}
+// Read only CYBEXO declarations. Generic CMS or GTM globals are not authority.
+// A legacy GTM installation has no host field; the WordPress connector supplies
+// its own marker before GTM. No release/build value selects a separate engine.
+function installationContext(settingsId) {
+  var declared = copyFromWindow('cybexoCmpContextV1');
+  var legacy = copyFromWindow('cybexoCmpInstallationV1');
+  var wp = copyFromWindow('__cybexoWpEngineInstaller');
+  var bootstrap = copyFromWindow('__cybexoNativeGtmBootstrap');
+  var host = 'direct';
+  if (declared !== undefined) {
+    if (getType(declared) !== 'object' || declared.contractVersion !== 1) return undefined;
+    if (declared.appId !== undefined && declared.appId !== '' && declared.appId !== settingsId) return undefined;
+    if (declared.hostPlatform !== undefined && declared.hostPlatform !== '' &&
+        declared.hostPlatform !== 'direct' && declared.hostPlatform !== 'wordpress') return undefined;
+    if (declared.installer !== undefined && declared.installer !== '' && declared.installer !== 'gtm') return undefined;
+    if (declared.googleOwner !== undefined && declared.googleOwner !== '' && declared.googleOwner !== 'native-gtm') return undefined;
+    if (declared.hostPlatform) host = declared.hostPlatform;
+  }
+  if (getType(legacy) === 'object') {
+    if (legacy.appId !== undefined && legacy.appId !== '' && legacy.appId !== settingsId) return undefined;
+    if (legacy.platform !== undefined && legacy.platform !== '' && legacy.platform !== 'gtm') return undefined;
+    if (legacy.googleOwner !== undefined && legacy.googleOwner !== '' && legacy.googleOwner !== 'native-gtm') return undefined;
+  }
+  if (wp === 'wordpress' || wp === 'direct') return undefined;
+  if (wp === 'gtm') {
+    if (declared && declared.hostPlatform && declared.hostPlatform !== 'wordpress') return undefined;
+    host = 'wordpress';
+  }
+  if (bootstrap !== undefined) {
+    if (getType(bootstrap) !== 'object' || bootstrap.appId !== settingsId ||
+        bootstrap.installer !== 'gtm' || bootstrap.googleOwner !== 'native-gtm' ||
+        (bootstrap.state !== 'waiting' && bootstrap.state !== 'started') ||
+        (bootstrap.hostPlatform !== 'direct' && bootstrap.hostPlatform !== 'wordpress')) return undefined;
+    if ((declared && declared.hostPlatform && declared.hostPlatform !== bootstrap.hostPlatform) ||
+        (wp === 'gtm' && bootstrap.hostPlatform !== 'wordpress')) return undefined;
+    host = bootstrap.hostPlatform;
+  }
+  return {hostPlatform: host, installer: 'gtm', googleOwner: 'native-gtm', bootstrap: bootstrap !== undefined};
 }
 function readContract(owner) {
   var version = copyFromWindow('CybexoConsentEngine.contractVersion');
@@ -198,6 +236,8 @@ function observe(owner) {
     uiVisible: snapshot.uiVisible, lastDecisionAction: snapshot.lastDecisionAction,
     analyticsEffective: snapshot.analytics && snapshot.analytics.effective,
     googleEnabled: snapshot.google.enabled, googleOwner: snapshot.google.owner,
+    engineRelease: snapshot.identity.engineRelease, engineVersion: snapshot.identity.engineVersion,
+    buildId: snapshot.identity.buildId,
     signals: snapshot.google.signals ? state(snapshot.google.signals) : null};
   // This is observation only. The core reserves the Google slot and invokes the
   // one native callback below; a subscriber must not become a second writer.
@@ -231,10 +271,11 @@ function settle(owner, status) {
   var identityError = settingsId.slice(0, 4) === 'NXG-'
     ? 'Legacy NXG App IDs are retired in this template. Migrate the app in CYBEXO and copy its CYB App ID; do not rename the prefix. Reload after updating the tag.'
     : 'A valid CYB App ID is required. Copy the CYB- ID with 10 lowercase letters or digits from the CYBEXO dashboard.';
+  var context = installationContext(settingsId);
   var owner = templateStorage.getItem(OWNER);
   if (owner) {
-    if (!validId || owner.settingsId !== settingsId || owner.engineRelease !== ENGINE_RELEASE || owner.adapterVersion !== ADAPTER_VERSION) {
-      log('Cybexo CMP: ' + (validId ? 'Conflicting Settings IDs. Consent remains denied; correct configuration and reload.' : identityError));
+    if (!validId || !context || owner.settingsId !== settingsId || owner.contractVersion !== 1 || owner.hostPlatform !== context.hostPlatform) {
+      log('Cybexo CMP: ' + (validId ? 'Conflicting App or installation context. Consent remains denied; correct configuration and reload.' : identityError));
       if (owner.status === 'pending') settle(owner, 'failed');
       else { owner.status = 'failed'; stopObserving(owner); deny(); }
       finish(false);
@@ -245,14 +286,9 @@ function settle(owner, status) {
     else finish(owner.status === 'loaded');
     return;
   }
-  // Direct adapters reserve an installer before the asynchronous engine exists.
-  // WP managed-GTM mode does not claim this direct-installation marker.
-  var installer = copyFromWindow('cybexoCmpInstallationV1');
-  if (getType(installer) === 'object' && getType(installer.appId) === 'string' &&
-      getType(installer.platform) === 'string' && installer.platform !== '' && installer.platform !== 'gtm' &&
-      getType(installer.release) === 'string' && installer.release !== '' &&
-      (installer.googleOwner === 'direct' || installer.googleOwner === 'none')) {
-    log('Cybexo CMP: ENGINE_ALREADY_OWNED. Disable the competing engine installer before using GTM.');
+  // Reject reserved competing ownership before any Google defaults or callbacks.
+  if (!context) {
+    log('Cybexo CMP: ENGINE_CONTEXT_CONFLICT. Use one App, installer and Google consent owner.');
     finish(false);
     return;
   }
@@ -281,7 +317,7 @@ function settle(owner, status) {
     regional.wait_for_update = wait;
     setDefaultConsentState(regional);
   }
-  owner = {settingsId: settingsId, engineRelease: ENGINE_RELEASE, adapterVersion: ADAPTER_VERSION,
+  owner = {settingsId: settingsId, contractVersion: 1, hostPlatform: context.hostPlatform, adapterVersion: ADAPTER_VERSION,
     status: 'pending', waiters: [finish], contractState: 'ENGINE_PENDING', attempts: 0, revision: -1};
   // Register the native update owner before the asynchronous loader can run.
   var registered = setInWindow(CALLBACK, function (signals) {
@@ -300,11 +336,23 @@ function settle(owner, status) {
     return;
   }
   templateStorage.setItem(OWNER, owner);
+  if (context.bootstrap) {
+    // Defaults and the native callback exist before the common loader can start.
+    if (callInWindow('cybexoCmpResumeGtm', settingsId) === true) {
+      settle(owner, 'loaded');
+      queueObservation(owner);
+    } else {
+      log('Cybexo CMP: Native bootstrap handoff failed. Reload after correcting the installation.');
+      settle(owner, 'failed');
+    }
+    return;
+  }
   var url = LOADER + '?data-settings-id=' + encodeUriComponent(settingsId)
     + '&data-cdn-url=' + encodeUriComponent(CDN)
     + '&data-assets-url=' + encodeUriComponent(ASSETS)
     + '&data-developer-id=' + DEVELOPER_ID + '&data-consent-mode=off'
-    + '&data-engine-release=' + ENGINE_RELEASE + '&data-engine-contract=1'
+    + '&data-engine-contract=1&data-host-platform=' + context.hostPlatform
+    + '&data-installer=gtm&data-google-owner=native-gtm'
     + '&data-installation-platform=gtm&data-adapter-version=' + ADAPTER_VERSION;
   injectScript(url, function () {
     // Download completion is separate from configuration/GVL/CMP readiness.
@@ -313,7 +361,7 @@ function settle(owner, status) {
   }, function () {
     log('Cybexo CMP: Loader failed. Consent remains denied; reload to retry.');
     settle(owner, 'failed');
-  }, 'cybexo-cmp-' + settingsId + '-' + ENGINE_RELEASE);
+  }, 'cybexo-cmp-' + settingsId + '-gtm');
 })();
 
 
@@ -527,7 +575,7 @@ ___WEB_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/loader.js*"
+                "string": "https://cmp.cybexo.com/loader.js?*"
               }
             ]
           }
@@ -745,6 +793,162 @@ ___WEB_PERMISSIONS___
                     "boolean": false
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "cybexoCmpContextV1"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "__cybexoWpEngineInstaller"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "__cybexoNativeGtmBootstrap"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "cybexoCmpResumeGtm"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
               }
             ]
           }
@@ -769,7 +973,6 @@ ___WEB_PERMISSIONS___
     "isRequired": true
   }
 ]
-
 
 ___TESTS___
 
@@ -857,7 +1060,7 @@ scenarios:
     mock('copyFromWindow', function () {});
     mock('callInWindow', function () {});
     mock('callLater', function () {});
-    mockObject('templateStorage', {getItem:function () { return {settingsId:'CYB-fixture001',engineRelease:'1.5.41-dc8923e48269',adapterVersion:'gtm-v1.0.0',status:'loaded',waiters:[]}; }});
+    mockObject('templateStorage', {getItem:function () { return {settingsId:'CYB-fixture001',contractVersion:1,hostPlatform:'direct',adapterVersion:'gtm-v1.0.0',status:'loaded',waiters:[]}; }});
     runCode({settingsId:'CYB-fixture001'});
     assertApi('setDefaultConsentState').wasNotCalled();
     assertApi('updateConsentState').wasNotCalled();

@@ -25,7 +25,7 @@ function snapshot(overrides = {}) {
     error: null, ...overrides
   };
 }
-function harness({existingEngine, subscriptionUnavailable = false, nativeThrows = false, installerOwner} = {}) {
+function harness({existingEngine, subscriptionUnavailable = false, nativeThrows = false, installerOwner, context, wpInstaller, bootstrap, resume} = {}) {
   const calls = [], store = new Map(), globals = {}, loads = [], later = [], listeners = new Set();
   let engine = existingEngine, tagId = 0, current;
   const apis = {
@@ -39,10 +39,11 @@ function harness({existingEngine, subscriptionUnavailable = false, nativeThrows 
       globals[key] = value;
       return true;
     },
-    copyFromWindow: path => { if (path === 'cybexoCmpInstallationV1') return clone(installerOwner); assert.equal(path, 'CybexoConsentEngine.contractVersion'); return engine?.contractVersion; },
+    copyFromWindow: path => { if (path === 'cybexoCmpInstallationV1') return clone(installerOwner); if (path === 'cybexoCmpContextV1') return clone(context); if (path === '__cybexoWpEngineInstaller') return wpInstaller; if (path === '__cybexoNativeGtmBootstrap') return clone(bootstrap); assert.equal(path, 'CybexoConsentEngine.contractVersion'); return engine?.contractVersion; },
     callInWindow: (path, ...args) => {
       calls.push(['execute', path]);
       assert.ok(!['setTimeout','clearTimeout','setInterval','clearInterval'].includes(path), 'GTM forbids predefined Window timer keys');
+      if (path === 'cybexoCmpResumeGtm') return resume?.(...args);
       if (path === 'CybexoConsentEngine.getSnapshot') return engine?.getSnapshot();
       if (path === 'CybexoConsentEngine.subscribe') return engine?.subscribe(args[0]);
       assert.fail('undeclared window API: ' + path);
@@ -156,7 +157,7 @@ test('adapter-status causes no new read, write, subscription or fake acknowledgm
   assert.doesNotMatch(code, /registerAdapter|\.report\(|acknowledged/);
 });
 
-for (const field of ['appId', 'engineRelease', 'engineVersion', 'buildId', 'installationPlatform', 'adapterVersion', 'googleOwner']) {
+for (const field of ['appId', 'installationPlatform', 'installer', 'hostPlatform', 'googleOwner']) {
   test('wrong ' + field + ' fails closed and removes the observer', () => {
     const h = harness(); h.ready();
     h.publish(snapshot({revision: 2, identity: {...snapshot().identity, [field]: 'wrong'}})); h.flush();
@@ -206,8 +207,8 @@ test('conflicting tag cancels subscription and stale queued observation cannot r
   assert.equal(h.owner().snapshot.revision, 1);
 });
 
-test('conflicting release cannot join the current template owner', () => {
-  const h = harness(); h.ready(); h.owner().engineRelease = 'previous-release'; h.run();
+test('conflicting contract cannot join the current template owner', () => {
+  const h = harness(); h.ready(); h.owner().contractVersion = 2; h.run();
   assert.equal(h.loads.length, 1); assert.equal(h.listeners.size, 0);
   assert.equal(h.native(granted), false); assert.deepEqual(h.updates(), [['update', denied]]);
 });
@@ -244,7 +245,11 @@ test('window capabilities are explicit and read-only except for the one native c
     ['CybexoConsentEngine.contractVersion', true, false, false],
     ['CybexoConsentEngine.getSnapshot', false, false, true],
     ['CybexoConsentEngine.subscribe', false, false, true],
-    ['cybexoCmpInstallationV1', true, false, false]
+    ['cybexoCmpInstallationV1', true, false, false],
+    ['cybexoCmpContextV1', true, false, false],
+    ['__cybexoWpEngineInstaller', true, false, false],
+    ['__cybexoNativeGtmBootstrap', true, false, false],
+    ['cybexoCmpResumeGtm', false, false, true]
   ]);
 });
 
@@ -255,7 +260,7 @@ for (const platform of ['direct', 'wordpress', 'shopify', 'drupal']) for (const 
   assert.ok(!h.calls.some(call => ['default', 'developer', 'update'].includes(call[0])));
   assert.deepEqual(h.calls.at(-1), ['failure', 1]);
 });
-for (const installerOwner of [undefined, false, null, true, {}, {platform: 'drupal'}, {appId: '', platform: '', release, googleOwner: 'direct'}, {appId: '', platform: 'drupal', release: '', googleOwner: 'direct'}, {appId: '', platform: 'drupal', release, googleOwner: 'unknown'}, {appId: 'CYB-fixture001', platform: 'gtm', release, googleOwner: 'native-gtm'}]) test('absent or malformed direct installer marker does not claim an owner: '+JSON.stringify(installerOwner), () => {
+for (const installerOwner of [undefined, false, null, true, {}, {appId: 'CYB-fixture001', platform: 'gtm', googleOwner: 'native-gtm'}]) test('absent or compatible legacy marker permits GTM: '+JSON.stringify(installerOwner), () => {
   const h = harness({installerOwner}); h.run(); assert.equal(h.loads.length, 1);
   assert.equal(typeof h.globals.cybexoGtmConsentUpdate, 'function');
   assert.equal(h.calls.filter(call => call[0] === 'default').length, 1);
@@ -283,4 +288,86 @@ test('Google-off API arriving after the sole load observation remains honestly u
   assert.equal(h.owner().contractState, 'ENGINE_NOT_AVAILABLE'); assert.equal(h.listeners.size, 0);
   assert.equal(h.calls.filter(call => call[0] === 'default').length, 1); assert.deepEqual(h.updates(), []);
   assert.equal(h.later.length, 0);
+});
+
+
+test('one shared compatible build is accepted without exact version, build or adapter equality', () => {
+  const h = harness();
+  const identity = {...snapshot().identity, engineRelease: 'shared-next', engineVersion: '9.0.0',
+    buildId: 'build-next', adapterVersion: 'diagnostic-next', installer: 'gtm', hostPlatform: 'direct'};
+  h.ready(snapshot({identity}));
+  assert.equal(h.owner().contractState, 'ENGINE_READY');
+  assert.equal(h.owner().snapshot.engineRelease, 'shared-next');
+  assert.equal(h.owner().snapshot.engineVersion, '9.0.0');
+  assert.equal(h.owner().snapshot.buildId, 'build-next');
+  assert.equal(h.native(granted), true);
+  assert.deepEqual(h.updates(), [['update', granted]]);
+});
+
+for (const options of [
+  {wpInstaller: 'gtm'},
+  {context: {contractVersion: 1, appId: 'CYB-fixture001', hostPlatform: 'wordpress', installer: 'gtm', googleOwner: 'native-gtm'}},
+  {wpInstaller: 'gtm', installerOwner: {appId: 'CYB-fixture001', platform: 'gtm', googleOwner: 'native-gtm'}}
+]) test('WordPress host retains GTM installer and native owner: ' + JSON.stringify(options), () => {
+  const h = harness(options); h.run();
+  const url = new URL(h.loads[0].url);
+  assert.equal(url.pathname, '/loader.js');
+  assert.equal(url.searchParams.get('data-host-platform'), 'wordpress');
+  assert.equal(url.searchParams.get('data-installer'), 'gtm');
+  assert.equal(url.searchParams.get('data-google-owner'), 'native-gtm');
+  assert.equal(url.searchParams.has('data-engine-release'), false);
+  h.install(snapshot({identity: {...snapshot().identity, installer: 'gtm', hostPlatform: 'wordpress'}}));
+  h.loads[0].success(); h.flush();
+  assert.equal(h.owner().contractState, 'ENGINE_READY');
+  assert.equal(h.native(granted), true); assert.equal(h.native(denied), true);
+  assert.deepEqual(h.updates(), [['update', granted], ['update', denied]]);
+});
+
+for (const options of [
+  {wpInstaller: 'wordpress'}, {wpInstaller: 'direct'},
+  {context: {contractVersion: 2}}, {context: null},
+  {context: {contractVersion: 1, appId: 'CYB-other00001'}},
+  {context: {contractVersion: 1, hostPlatform: 'shopify'}},
+  {context: {contractVersion: 1, hostPlatform: 'drupal'}},
+  {context: {contractVersion: 1, installer: 'direct'}},
+  {context: {contractVersion: 1, googleOwner: 'direct'}},
+  {context: {contractVersion: 1, googleOwner: 'none'}},
+  {context: {contractVersion: 1, hostPlatform: 'direct'}, wpInstaller: 'gtm'},
+  {context: {contractVersion: 1, hostPlatform: 'wordpress'}, wpInstaller: 'wordpress'},
+  {installerOwner: {appId: 'CYB-other00001', platform: 'gtm', googleOwner: 'native-gtm'}},
+  {installerOwner: {appId: 'CYB-fixture001', platform: 'direct', googleOwner: 'direct'}},
+  {installerOwner: {platform: 'drupal'}},
+  {context: {contractVersion: 1, appId: 'CYB-fixture001'}, installerOwner: {appId: 'CYB-other00001'}}
+]) test('conflicting declared context fails before defaults, callback or network: ' + JSON.stringify(options), () => {
+  const h = harness(options); h.run();
+  assert.equal(h.loads.length, 0);
+  assert.equal(h.globals.cybexoGtmConsentUpdate, undefined);
+  assert.ok(!h.calls.some(call => ['default', 'developer', 'update'].includes(call[0])));
+  assert.deepEqual(h.calls.at(-1), ['failure', 1]);
+});
+
+test('WordPress compatibility preserves older v1 snapshots without new host fields', () => {
+  const h = harness({wpInstaller: 'gtm'}); h.ready();
+  assert.equal(h.owner().contractState, 'ENGINE_READY');
+  assert.equal(h.native(granted), true);
+});
+
+
+const reservation={appId:'CYB-fixture001',hostPlatform:'direct',installer:'gtm',googleOwner:'native-gtm',state:'waiting'};
+for(const hostPlatform of ['direct','wordpress'])test('matching early '+hostPlatform+' reservation resumes once after native defaults and callback without injection',()=>{
+ let h,resumes=0;
+ h=harness({bootstrap:{...reservation,hostPlatform},resume:appId=>{
+  resumes++;assert.equal(appId,'CYB-fixture001');assert.equal(h.calls.filter(call=>call[0]==='default').length,1);assert.equal(typeof h.globals.cybexoGtmConsentUpdate,'function');return true;
+ }});
+ h.run();h.flush();h.run();assert.equal(resumes,1);assert.equal(h.loads.length,0);assert.equal(h.owner().hostPlatform,hostPlatform);assert.equal(h.owner().status,'loaded');
+ assert.deepEqual(h.calls.filter(call=>call[0]==='success'),[['success',1],['success',2]]);assert.deepEqual(h.updates(),[]);
+});
+for(const bootstrap of [null,{...reservation,appId:'CYB-other00001'},{...reservation,hostPlatform:'shopify'},{...reservation,installer:'direct'},{...reservation,googleOwner:'direct'},{...reservation,state:'unknown'}])test('invalid early reservation rejects before native defaults: '+JSON.stringify(bootstrap),()=>{
+ const h=harness({bootstrap,resume:()=>assert.fail('must not resume')});h.run();assert.equal(h.loads.length,0);assert.equal(h.globals.cybexoGtmConsentUpdate,undefined);assert.ok(!h.calls.some(call=>['default','developer','update'].includes(call[0])));assert.deepEqual(h.calls.at(-1),['failure',1]);
+});
+for(const options of [{wpInstaller:'gtm'},{context:{contractVersion:1,hostPlatform:'wordpress',installer:'gtm',googleOwner:'native-gtm'}}])test('early host conflicts fail before defaults '+JSON.stringify(options),()=>{
+ const h=harness({...options,bootstrap:reservation});h.run();assert.equal(h.loads.length,0);assert.ok(!h.calls.some(call=>['default','developer','update'].includes(call[0])));assert.deepEqual(h.calls.at(-1),['failure',1]);
+});
+for(const resume of [undefined,()=>false])test('failed or missing resume never injects a second loader or falls back to direct: '+String(resume),()=>{
+ const h=harness({bootstrap:reservation,resume});h.run();assert.equal(h.loads.length,0);assert.equal(h.owner().status,'failed');assert.deepEqual(h.updates(),[['update',denied]]);assert.equal(h.native(granted),false);
 });

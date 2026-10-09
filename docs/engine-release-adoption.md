@@ -1,46 +1,50 @@
-# Immutable engine selection
+# Shared engine delivery
 
-This is the local WEI-04 GTM source candidate. It has not been published to the Gallery or adopted by a GTM container. The Web release's delivery and platform qualification gates remain separate from these source tests.
+This is the local GTM recovery source candidate. It has not been published to the Gallery or adopted by a GTM container. The Web source, atomic shared release delivery, early TCF startup, GTM import and site qualification gates remain separate.
 
-| Selection | Value |
+| Contract | Value |
 | --- | --- |
-| Engine release | `1.5.41-dc8923e48269` |
-| Engine source | `04a91543` |
-| Engine build | `production.20261009.070006.runlocal.04a91543` |
+| Engine loader and assets | `https://cmp.cybexo.com/loader.js`, `https://cmp.cybexo.com` |
 | Engine contract | `1` |
-| Installation platform | `gtm` |
-| Adapter identity | `gtm-v1.0.0` |
-| Google owner | `native-gtm` when enabled; `none` when app-level emission is disabled |
-| Loader | `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/loader.js` |
-| Bootstrap | `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/tcf-bootstrap.js` |
-| Assets | `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269` |
+| Installer and legacy installation platform | `gtm` |
+| Host platform | `direct`, or `wordpress` when declared by the CYBEXO connector |
+| Connector diagnostic | `gtm-v1.0.0` |
+| Google owner | `native-gtm` when enabled; `none` when app configuration disables emission |
 
-The template passes the App ID, edge configuration URL, matching asset URL, developer ID, `data-consent-mode=off`, and all four release/contract/platform/adapter metadata fields as loader query parameters. Its injection permission is restricted to the selected loader. There is no editable runtime URL, mutable fallback, version selector, or automatic latest-release selection. Release changes require reviewed template source and a new published container selection.
+Every platform uses one engine build. The template has no release selector, pinned engine version or separate GTM engine catalogue. It passes the App ID, fixed configuration/assets endpoints, native owner and installer context to the common loader. Its injection permission allows only `https://cmp.cybexo.com/loader.js?*`. GTM's `injectScript` has no integrity argument; no loader SRI is claimed. Atomic release delivery, cache behavior and rollback must be verified for the shared Web release separately.
 
-The exact Web descriptor is retained as [publisher/engine-release.json](../publisher/engine-release.json). The paired inline bootstrap has unchanged bytes. GTM's documented `injectScript` API has no integrity or crossorigin argument, so the template does not claim loader SRI. The pinned path, provider byte-identity verification against the descriptor, and immutable release retention are the available delivery controls. The synchronous external bootstrap example carries SHA-384 SRI and anonymous CORS; an inline publisher bootstrap uses its exact bytes and the publisher's CSP nonce/hash. See [Google's custom-template API reference](https://developers.google.com/tag-platform/tag-manager/templates/api#injectscript).
+The historical descriptor and unchanged bootstrap bytes remain in `publisher/` for compatibility evidence. They do not select the current loader. The older `gtm-rename-*` scripts and their historical tracker documents are preserved; several expect source shapes already absent from the native-consent baseline and are not rewritten merely to pass.
 
-## Observation and ownership
+## Context and ownership
 
-`copyFromWindow` reads the contract version and the shared adapter installer marker `cybexoCmpInstallationV1`. A shaped record `{appId, platform, release, googleOwner}` with a non-GTM platform and `direct` or `none` Google owner is rejected before native defaults, callback registration or loader injection. Direct, WordPress-direct, Shopify and Drupal installers claim it synchronously before their defaults, covering the interval before the public engine API exists. WP managed-GTM mode stays unmarked. Empty, false and malformed records do not claim an owner. An empty string App ID is permitted in the marker because excluded Drupal pages still establish denied defaults. This cooperative adapter marker does not alter the frozen engine contract. `callInWindow` calls only `getSnapshot` and `subscribe`. GTM forbids predefined Window timer keys, so the template has no timer permission, timer alias or polling loop. `callLater` coalesces lifecycle observations and re-reads the current snapshot when the callback executes. The template validates App, contract, release, engine version/build, platform, adapter version, and Google owner. It stores a diagnostic projection in its existing template storage owner; no persistence schema or receipt payload is introduced.
+Before defaults, the template reads CYBEXO's `cybexoCmpContextV1`, `cybexoCmpInstallationV1`, `__cybexoWpEngineInstaller` and frozen `__cybexoNativeGtmBootstrap` declarations. Conflicting App IDs, a competing installer/Google owner, unsupported Shopify or Drupal host, or conflicting WordPress host declarations stop startup before defaults, callback registration and network injection. No generic WordPress/Shopify/GTM global selects a platform. Legacy `gtm` means installer; WordPress remains a separate host.
 
-Engine download completion and readiness remain separate. One coalesced observation runs per loader completion, native callback or subscribed v1 event. Missing API is reported as `ENGINE_NOT_AVAILABLE` without self-scheduling; a later native callback can reattach to the current snapshot. An app with Google disabled may remain diagnostically unavailable when the API appears after load completion because it emits no native callback; this does not suppress platform choices or manufacture a Google update. `adapter-status` events do not trigger application. The template never claims a Google registration or reports acknowledgment: the core reserves that slot and invokes the existing native callback. Native transport failure has no direct `gtag` fallback. Google-off configuration can retain calculated platform signals without native choice updates; GTM defaults already ran before asynchronous configuration. This is not a promise of zero Google initialization.
+Native `setDefaultConsentState` runs before registering the sole `cybexoGtmConsentUpdate` callback. With a matching early reservation, the template then calls `cybexoCmpResumeGtm(appId)` and skips injection only on `true`; failure denies without a second load. Without a reservation it injects the common loader as before. The explicit native owner plus legacy `data-consent-mode=off` suppress the direct page writer. App-level Google off may suppress later updates, but does not retract native defaults already established before asynchronous configuration. This integration therefore does not promise zero Google initialization.
 
-The snapshot may be transaction-pending when the engine calls its native transport. The native callback therefore validates the selected identity and emission setting but uses the engine-supplied callback vector, preserving existing TCF, US and global policy. It does not replace that vector with a pending snapshot's null signals. The observer never becomes a second writer.
+Snapshot admission checks App ID, contract, legacy GTM installation identity and Google owner. New `installer`/`hostPlatform` fields must agree when present; older compatible contract-v1 snapshots without those added fields remain accepted. Engine release, engine version, build and adapter version are diagnostic values and never exact-build admission rules. The native callback uses the engine-calculated vector even during a pending transaction. Observation never becomes another consent writer.
 
-A compatible WordPress v1 adapter can register the `wordpress` kind on this GTM-installed engine. Its GTM installer option must suppress its own loader and direct Google commands, keep one synchronous bootstrap, and accept the `gtm`/`gtm-v1.0.0` identity. An already initialized Direct or WordPress engine is rejected by this template before native defaults or callback takeover. Concurrent startup conflicts are additionally governed by the Web engine's loader ownership checks. No additional Google writer may be registered by WordPress.
+A compatible WordPress platform connector may accompany this GTM installer. It must suppress its own engine load and Google commands. The engine identity retains `installationPlatform: gtm` while carrying `hostPlatform: wordpress` and `installer: gtm` separately. Already initialized competing engines are rejected before native defaults.
 
-## Source validation and publication order
+Download completion is not readiness. `callLater` coalesces observations and reads the latest snapshot through explicit `getSnapshot`/`subscribe` permissions. No Window timers, polling loop or invented acknowledgment is used. Missing API remains `ENGINE_NOT_AVAILABLE`; a later native callback retries observation. An app with Google disabled may remain diagnostically unavailable if its API appears only after the load observation and it emits no callback.
 
-Run:
+## Early TCF and qualification
+
+The ordinary template path injects the loader after GTM starts. It cannot supply a TCF API to consumers that already ran outside GTM. The same public loader supports `data-gtm-bootstrap="on"` for an early synchronous reservation. Its App/host/installer/owner diagnostic is checked before native defaults. The loader's resume function rechecks current context and callback ownership, starts at most once and reports acceptance rather than readiness. No timers, separate customer bootstrap URL or long inline program are introduced. Local component cases cover waiting, delayed handoff, mismatch, duplicate and failure behavior; actual platform wiring and qualification are deferred. See [installation guidance](installation.md#tcf-page-setup).
+
+## Source validation and promotion
+
+Run the local sandbox and retained bootstrap checks:
 
 ```sh
-node --test scripts/native-consent.test.mjs scripts/publisher-bootstrap.test.mjs scripts/engine-contract.test.mjs scripts/engine-release.test.mjs
+node --test scripts/native-consent.test.mjs scripts/publisher-bootstrap.test.mjs scripts/engine-contract.test.mjs scripts/engine-release.test.mjs scripts/embedded-scenarios.test.mjs
 ```
 
-These tests execute the exact shipped template through a local VM with explicit GTM API mocks. They preserve the retained native/default/identity tests and add delayed readiness, latest-state observation, restore/cancel, regional vectors, Google off, identity mismatch, stale callback cancellation, duplicates, cross-installer ownership, and no invented acknowledgment. Bootstrap tests run the shipped JavaScript. They do not substitute for GTM sandbox compilation/import, Tag Assistant, Google delivery evidence, warm-cache migration, or the installed WordPress combination.
+Run the actual shared source integration against the reviewed Web checkout, using its existing dependencies without installing packages:
 
-The older `gtm-rename-*` scripts and their historical tracker documents are preserved. Several expect variable names and extraction shapes already absent from the baseline native-consent template; they are not the current candidate verifier and must not be rewritten merely to pass.
+```sh
+CYBEXO_WEB_SOURCE_ROOT=/absolute/path/to/reviewed/web/source node --test scripts/shared-engine-integration.test.mjs
+```
 
-Keep `metadata.yaml` unchanged until the reviewed code/template/bootstrap/descriptor commit exists. Record that exact full Git commit SHA in a subsequent metadata-only promotion commit with its release notes. Do not point Gallery metadata to its own commit, an uncommitted working tree, a guessed SHA, or the Web engine SHA. After the separate publication gate, verify the selected Gallery source SHA, import/compile and embedded tests, update the intended tag, preview, and publish the container only through the authorized rollout. Repository publication alone does not prove installation adoption.
+The latter bundles the real loader in memory and executes it with the exact template sandbox source. It covers Direct and WordPress hosts, configuration delay, one native default, no direct Google writes, choice, cancel, saved restoration, withdrawal and duplicates. The build identifier is deliberately different from the historical pinned build. It skips explicitly without a source path. Local VM tests and the embedded-scenario harness do not substitute for actual GTM compilation/import, supported permission validation, Tag Assistant, platform-browser or delivery evidence.
 
-The next release must preserve earlier immutable engine directories. The mutable compatibility root is not rewritten by this adapter migration. Its repair or retirement remains an explicit WEI-07 decision.
+Keep `metadata.yaml` unchanged until the reviewed template commit exists. Any later authorized promotion records that exact full source SHA in a subsequent metadata-only commit. Repository publication does not prove container adoption. Preserve historical immutable engine directories for retained installs; changing the common root remains part of the shared engine release gate, not an independent GTM release.
