@@ -25,7 +25,7 @@ This template release accepts only `CYB-` App IDs. Before updating an installati
 
 - Native GTM consent APIs manage `ad_storage`, `analytics_storage`, `ad_user_data` and `ad_personalization`.
 - The fixed Google developer ID is `dZTNmYW`.
-- The template loads the production CMP from CYBEXO's fixed endpoint and passes subsequent choices through the native GTM bridge.
+- The template selects immutable engine release `1.5.40-23fc15424d75` and passes subsequent choices through the native GTM bridge. The matching bootstrap and release descriptor are in `publisher/`.
 - `wait_for_update` accepts 500–10,000 milliseconds for asynchronous loading; invalid or out-of-range values use 500 milliseconds. It does not wait for a visitor indefinitely or prove that the CMP is ready.
 - Repeated tag execution shares the loader. Loader failure is reported as failure; script-load success alone does not certify CMP readiness.
 
@@ -37,4 +37,6 @@ This repository uses the [Apache License 2.0](LICENSE). The publisher bootstrap 
 
 ## Runtime update delivery
 
-This release moves the managed loader to a revalidating delivery URL. Update the template, preview the existing consent tag and publish the container so returning browsers use the new URL. Keep the same App ID, tag settings and consent initialization trigger. Saved choices are retained; already-open pages take up the update on a normal navigation or reload.
+This source candidate selects engine release `1.5.40-23fc15424d75` through an immutable loader path. The template identifies itself as `gtm-v1.0.0` using engine contract v1. It observes engine readiness and choices through supported sandbox APIs; the native callback remains the only Google update writer. Repository changes do not update an installed Gallery template or container.
+
+When this template version becomes available, review the Gallery update, preview the existing consent tag and publish the container. Keep the same App ID, tag settings and consent initialization trigger. Saved choices retain the engine's existing validation rules; already-open pages take up the selection on a normal navigation or reload. See [release pairing and maintainer checks](docs/engine-release-adoption.md).

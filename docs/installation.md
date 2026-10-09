@@ -17,7 +17,15 @@ Alternatively, host the exact [publisher/tcf-bootstrap.js](../publisher/tcf-boot
 <!-- Your normal Google Tag Manager container snippet follows. -->
 ```
 
-Deploy the file before adding this reference. The production CYBEXO URL is `https://cmp.cybexo.com/tcf-bootstrap.js`; an external reference also depends on that request being allowed by the site's CSP and successfully delivered. Verify delivery on the actual site. The bootstrap and current loader must be a qualified compatible pair; this repository records the tested bootstrap in [publisher/README.md](../publisher/README.md).
+Deploy the file before adding this reference. The selected CYBEXO URL is `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/tcf-bootstrap.js`; an external reference also depends on that request being allowed by the site's CSP and successfully delivered. For that cross-origin URL, use the exact published integrity value and anonymous CORS:
+
+```html
+<script src="https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/tcf-bootstrap.js"
+  integrity="sha384-XJ+QMWVaYoQHdg4EzFO01XDXyOMdzFWKn0c35kM/iN2lT7YE3MjU2LBA4Q2YvTLn"
+  crossorigin="anonymous"></script>
+```
+
+Verify delivery on the actual site. The bootstrap and selected loader must be a qualified compatible pair; this repository records the tested bootstrap in [publisher/README.md](../publisher/README.md).
 
 The bootstrap answers `ping` immediately, queues requests for the full API, and supports cross-frame requests. A locator iframe is created when the page body is available. If the CMP loader has not executed, queued listeners receive no invented TC data. When the CMP becomes ready in that same document, queued requests reach the full API. The bootstrap preserves an existing `__tcfapi` function and its queue; install only one CMP owner and do not layer CYBEXO over a different CMP.
 
@@ -47,7 +55,7 @@ Migrate a legacy App ID before updating to this template release. Complete a sup
 
 ## Consent ownership
 
-This template sets native defaults and registers the native update callback before loading CYBEXO CMP. It loads the production endpoint with `data-consent-mode=off`, which disables the loader's separate `gtag` command path. The template's native bridge remains responsible for publishing validated choices to GTM. This flag does not mean that Google consent is disabled for this integration. Keep Consent Mode enabled in the app's dashboard configuration: the template does not override an app-level disabled setting.
+This template sets native defaults and registers the native update callback before loading CYBEXO CMP. It loads `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js` with `data-consent-mode=off`, which disables the loader's separate `gtag` command path. The template's native bridge remains responsible for publishing validated choices to GTM. This flag does not mean that Google consent is disabled for this integration. Keep Consent Mode enabled in the app's dashboard configuration: the template does not override an app-level disabled setting.
 
 Web CMP 1.5.38 and later also expose `enableAdvertiserConsentMode: false` while the native GTM bridge is present, so automatic TCF inference cannot overwrite the bridge's saved values when the settings dialog opens. The standard TCF API, disclosures and lifecycle events remain available. Do not separately set `window.gtag_enable_tcf_support = true` on these pages; that would explicitly introduce a second Google consent writer. Direct Web installations retain their own inference configuration.
 
@@ -56,6 +64,10 @@ After saving consent, reopen settings, change a switch without saving, and close
 Do not install the direct Web consent-default snippet alongside the GTM template. It would introduce another consent owner. If you migrate from a direct installation, remove the old consent commands and direct loader while retaining the synchronous TCF block when TCF is used.
 
 If the loader fails or conflicting Settings IDs/consent callbacks are detected, the template reports failure and keeps consent denied. Correct the configuration or delivery problem and reload the page. Firing the failed tag again in the same document does not restore permission.
+
+A compatible WordPress v1 platform adapter may run on the same page with its installer set to GTM. It must suppress the WordPress loader and direct Google commands, preserve one early TCF bootstrap, and accept this template's `gtm` installation identity. WordPress platform consent and the native Google transport have separate owners. Do not enable both engine installers.
+
+The template reads v1 snapshots only to observe the selected engine. It never infers consent from a download, emits a second update from a subscription, or reports platform acknowledgment. Its initial readiness observation retries for at most six seconds; if the API is still unavailable, the observation is marked unavailable. A later legitimate native callback attempts observation again. App-level Google emission off suppresses native choice updates, but does not retract GTM defaults already established before configuration arrived. Keep Consent Mode enabled for this integration; use the appropriate non-Google installation when no Google initialization is wanted.
 
 ## Verify before publishing
 

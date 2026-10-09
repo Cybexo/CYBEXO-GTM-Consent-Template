@@ -1,0 +1,65 @@
+{
+  "schema": "cybexo.engine.release.v1",
+  "id": "1.5.40-23fc15424d75",
+  "version": "1.5.40",
+  "build": "production.20261009.031052.runlocal.65b35513",
+  "commit": "65b35513",
+  "contractVersion": 1,
+  "path": "/releases/1.5.40-23fc15424d75/",
+  "files": [
+    {
+      "name": "111ng.svg",
+      "bytes": 53168,
+      "sha256": "bc9d13ddd3e4d993f39be8492d926c66618ed0706fb1ecf2a0531d51133407b8",
+      "integrity": "sha384-FrTzTWq8Q10RLH31kpWxVpy9w3vOZHWjskAgGtaYKqLlUN61NTRQ0Vl+NPbqrx8m"
+    },
+    {
+      "name": "IABTCF.svg",
+      "bytes": 230281,
+      "sha256": "1046a1577e975b86419e91d0b22b74f1358d7a6aeaaf1d014da34d8851085b55",
+      "integrity": "sha384-3142LNIV/q9sAjETwW8p/ydqtQ+B+VSMeGRAoluNzP7OB0egXNGZjXzY6qhL5BGI"
+    },
+    {
+      "name": "TCFCMP.png",
+      "bytes": 96066,
+      "sha256": "3a7a405cd3810053d33ad102a0ad62bcd995678fd7cd8e675d2d3430c7160fa7",
+      "integrity": "sha384-SX1VkZuqNY+vcxW4JP6l+4DjUEpr8h75sK5OEQRIGKq4X5gop7n87i4W1we63dFx"
+    },
+    {
+      "name": "cmplogo.svg",
+      "bytes": 25153,
+      "sha256": "bfa98f0d61c8f0302a29755ce5b4ead92eec44b46173e34160c16c5632a3aebc",
+      "integrity": "sha384-h/nkcFAzKrEp34GtNEXJOJe5vTIzE7ApBn7o39NQdXp+/4Bf/xpbMziWoFNXLd0A"
+    },
+    {
+      "name": "cybexo-cmp-build.json",
+      "bytes": 619,
+      "sha256": "45c534b0c7f208d036065e0a2e22da5531b13169a7a9f4bd8279a51699a1b43c",
+      "integrity": "sha384-AkeR1bw0d2nS7jYbsQbpDfngQwbQqxD6fhY6sT/vswilT2T3+FVzA8rxTiOMjrya"
+    },
+    {
+      "name": "loader.js",
+      "bytes": 3037317,
+      "sha256": "fa8e4e31806ba309c52a281f785eb4c5e6576dcbeb01aa123889b80860098fee",
+      "integrity": "sha384-/D5hq5yEPXJ230lhCUm/Ow/G12XAJPrfHvfexhX3evtww8qqwvyVuqr3+9slEp2Z"
+    },
+    {
+      "name": "ng.svg",
+      "bytes": 22448,
+      "sha256": "01e7833d638e1b586b5f14d6014b0079f74fa2d7a2f8321bf05049be3e81170d",
+      "integrity": "sha384-Db8T0SWj+SIZVWC4Qy7rFsPhpUyTtS9RuzmSSlXGctI8y3xfIbihAxQcvosqOCfj"
+    },
+    {
+      "name": "preview-loader.js",
+      "bytes": 2931225,
+      "sha256": "99db8f1cb874f845690e1baa0b21aa02331c1aea668bc2e40e5b00673d1d4c31",
+      "integrity": "sha384-SwxI0QYnw27WTCqeARVbCQ+VU7JLj+Ulgjh8z2fBa/yXVaJi74u4QZ1fY23BLywK"
+    },
+    {
+      "name": "tcf-bootstrap.js",
+      "bytes": 1236,
+      "sha256": "21e06e016ba11d83ef9634b798e79fa697ca368415a66112fbb9530ab78e7d6a",
+      "integrity": "sha384-XJ+QMWVaYoQHdg4EzFO01XDXyOMdzFWKn0c35kM/iN2lT7YE3MjU2LBA4Q2YvTLn"
+    }
+  ]
+}

@@ -83,15 +83,21 @@ const gtagSet = require('gtagSet');
 const setDefaultConsentState = require('setDefaultConsentState');
 const updateConsentState = require('updateConsentState');
 const setInWindow = require('setInWindow');
+const copyFromWindow = require('copyFromWindow');
+const callInWindow = require('callInWindow');
+const callLater = require('callLater');
 const templateStorage = require('templateStorage');
 const JSON = require('JSON');
 const getType = require('getType');
 const encodeUriComponent = require('encodeUriComponent');
 
 var KEYS = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
-var LOADER = 'https://cmp.cybexo.com/loader.js';
+var ENGINE_RELEASE = '1.5.40-23fc15424d75';
+var ENGINE_BUILD = 'production.20261009.031052.runlocal.65b35513';
+var ADAPTER_VERSION = 'gtm-v1.0.0';
+var ASSETS = 'https://cmp.cybexo.com/releases/' + ENGINE_RELEASE;
+var LOADER = ASSETS + '/loader.js';
 var CDN = 'https://edge.cybexo.com';
-var ASSETS = 'https://cmp.cybexo.com';
 var DEVELOPER_ID = 'dZTNmYW';
 var CALLBACK = 'cybexoGtmConsentUpdate';
 var OWNER = 'cybexoConsentOwner';
@@ -134,12 +140,88 @@ function regions(csv) {
   return output;
 }
 function deny() { updateConsentState(state(null)); }
+function stopObserving(owner) {
+  if (owner.timer !== undefined) callInWindow('clearTimeout', owner.timer);
+  owner.timer = undefined;
+  if (getType(owner.unsubscribe) === 'function') owner.unsubscribe();
+  owner.unsubscribe = undefined;
+}
+function failContract(owner, reason) {
+  if (owner.status === 'failed') return;
+  owner.contractState = reason;
+  stopObserving(owner);
+  log('Cybexo CMP: ' + reason + '. Correct the installation and reload.');
+  if (owner.status === 'pending') settle(owner, 'failed');
+  else { owner.status = 'failed'; deny(); }
+}
+function matchesIdentity(snapshot, owner) {
+  var identity = snapshot && snapshot.identity;
+  return snapshot && snapshot.schema === 'cybexo.consent.v1' && identity &&
+    identity.contractVersion === 1 && identity.appId === owner.settingsId &&
+    identity.engineRelease === ENGINE_RELEASE && identity.engineVersion === '1.5.40' && identity.buildId === ENGINE_BUILD &&
+    identity.installationPlatform === 'gtm' && identity.adapterVersion === ADAPTER_VERSION &&
+    ((identity.googleOwner === 'native-gtm' && snapshot.google && snapshot.google.owner === 'native-gtm') ||
+      (identity.googleOwner === 'none' && snapshot.google && snapshot.google.owner === 'none' && snapshot.google.enabled === false));
+}
+function readContract(owner) {
+  var version = copyFromWindow('CybexoConsentEngine.contractVersion');
+  if (version === undefined) return undefined;
+  if (version !== 1) { failContract(owner, 'ENGINE_CONTRACT_INCOMPATIBLE'); return undefined; }
+  var snapshot = callInWindow('CybexoConsentEngine.getSnapshot');
+  if (!matchesIdentity(snapshot, owner)) { failContract(owner, 'ENGINE_IDENTITY_MISMATCH'); return undefined; }
+  return snapshot;
+}
+function queueObservation(owner) {
+  if (owner.status === 'failed' || owner.observationQueued) return;
+  owner.observationQueued = true;
+  callLater(function () {
+    owner.observationQueued = false;
+    observe(owner);
+  });
+}
+function observe(owner) {
+  if (owner.status === 'failed') return;
+  // Read at application time, never reuse a captured event or delayed grant.
+  var snapshot = readContract(owner);
+  if (!snapshot) {
+    if (owner.status === 'failed' || owner.timer !== undefined) return;
+    if (owner.attempts >= 60) { owner.contractState = 'ENGINE_NOT_AVAILABLE'; return; }
+    owner.attempts++;
+    owner.timer = callInWindow('setTimeout', function () {
+      owner.timer = undefined;
+      observe(owner);
+    }, 100);
+    return;
+  }
+  if (owner.timer !== undefined) callInWindow('clearTimeout', owner.timer);
+  owner.timer = undefined;
+  if (getType(snapshot.revision) !== 'number' || snapshot.revision < owner.revision) return;
+  owner.revision = snapshot.revision;
+  owner.contractState = snapshot.state === 'error' ? 'ENGINE_ERROR'
+    : snapshot.google.enabled === false ? 'GOOGLE_DISABLED'
+    : snapshot.state === 'ready' && snapshot.pending === false ? 'ENGINE_READY' : 'ENGINE_PENDING';
+  owner.snapshot = {revision: snapshot.revision, decisionRevision: snapshot.decisionRevision,
+    state: snapshot.state, pending: snapshot.pending, decisionMade: snapshot.decisionMade,
+    uiVisible: snapshot.uiVisible, lastDecisionAction: snapshot.lastDecisionAction,
+    analyticsEffective: snapshot.analytics && snapshot.analytics.effective,
+    googleEnabled: snapshot.google.enabled, googleOwner: snapshot.google.owner,
+    signals: snapshot.google.signals ? state(snapshot.google.signals) : null};
+  // This is observation only. The core reserves the Google slot and invokes the
+  // one native callback below; a subscriber must not become a second writer.
+  if (!owner.subscribed) {
+    owner.subscribed = true;
+    owner.unsubscribe = callInWindow('CybexoConsentEngine.subscribe', function (event) {
+      if (event && event.type !== 'adapter-status') queueObservation(owner);
+    });
+    if (getType(owner.unsubscribe) !== 'function') failContract(owner, 'ENGINE_SUBSCRIPTION_UNAVAILABLE');
+  }
+}
 function settle(owner, status) {
   if (owner.status !== 'pending') return;
   owner.status = status;
   var waiters = owner.waiters;
   owner.waiters = [];
-  if (status === 'failed') deny();
+  if (status === 'failed') { stopObserving(owner); deny(); }
   for (var i = 0; i < waiters.length; i++) waiters[i](status === 'loaded');
 }
 
@@ -158,16 +240,33 @@ function settle(owner, status) {
     : 'A valid CYB App ID is required. Copy the CYB- ID with 10 lowercase letters or digits from the CYBEXO dashboard.';
   var owner = templateStorage.getItem(OWNER);
   if (owner) {
-    if (!validId || owner.settingsId !== settingsId) {
+    if (!validId || owner.settingsId !== settingsId || owner.engineRelease !== ENGINE_RELEASE || owner.adapterVersion !== ADAPTER_VERSION) {
       log('Cybexo CMP: ' + (validId ? 'Conflicting Settings IDs. Consent remains denied; correct configuration and reload.' : identityError));
       if (owner.status === 'pending') settle(owner, 'failed');
-      else { owner.status = 'failed'; deny(); }
+      else { owner.status = 'failed'; stopObserving(owner); deny(); }
       finish(false);
       return;
     }
     // Repeated triggers neither replace defaults nor reset an existing choice.
     if (owner.status === 'pending') owner.waiters.push(finish);
     else finish(owner.status === 'loaded');
+    return;
+  }
+  // Direct adapters reserve an installer before the asynchronous engine exists.
+  // WP managed-GTM mode does not claim this direct-installation marker.
+  var installer = copyFromWindow('cybexoCmpInstallationV1');
+  if (getType(installer) === 'object' && getType(installer.appId) === 'string' &&
+      getType(installer.platform) === 'string' && installer.platform !== '' && installer.platform !== 'gtm' &&
+      getType(installer.release) === 'string' && installer.release !== '' &&
+      (installer.googleOwner === 'direct' || installer.googleOwner === 'none')) {
+    log('Cybexo CMP: ENGINE_ALREADY_OWNED. Disable the competing engine installer before using GTM.');
+    finish(false);
+    return;
+  }
+  // Another engine is already initialized: do not write native defaults over it.
+  if (copyFromWindow('CybexoConsentEngine.contractVersion') !== undefined) {
+    log('Cybexo CMP: ENGINE_ALREADY_OWNED. Use one engine installation and reload.');
+    finish(false);
     return;
   }
   var wait = data.waitForUpdateMs * 1;
@@ -189,11 +288,17 @@ function settle(owner, status) {
     regional.wait_for_update = wait;
     setDefaultConsentState(regional);
   }
-  owner = {settingsId: settingsId, status: 'pending', waiters: [finish]};
+  owner = {settingsId: settingsId, engineRelease: ENGINE_RELEASE, adapterVersion: ADAPTER_VERSION,
+    status: 'pending', waiters: [finish], contractState: 'ENGINE_PENDING', attempts: 0, revision: -1};
   // Register the native update owner before the asynchronous loader can run.
   var registered = setInWindow(CALLBACK, function (signals) {
     if (owner.status === 'failed') return false;
+    // Validate available identity, but not the transaction's pending snapshot:
+    // the core calls this transport before publishing its coherent revision.
+    var current = readContract(owner);
+    if (owner.status === 'failed' || (current && (current.google.enabled === false || current.state === 'error'))) return false;
     updateConsentState(state(signals));
+    queueObservation(owner);
     return true;
   }, false);
   if (!registered) {
@@ -202,17 +307,20 @@ function settle(owner, status) {
     return;
   }
   templateStorage.setItem(OWNER, owner);
-  var url = LOADER + '?delivery=2&data-settings-id=' + encodeUriComponent(settingsId)
+  var url = LOADER + '?data-settings-id=' + encodeUriComponent(settingsId)
     + '&data-cdn-url=' + encodeUriComponent(CDN)
     + '&data-assets-url=' + encodeUriComponent(ASSETS)
-    + '&data-developer-id=' + DEVELOPER_ID + '&data-consent-mode=off';
+    + '&data-developer-id=' + DEVELOPER_ID + '&data-consent-mode=off'
+    + '&data-engine-release=' + ENGINE_RELEASE + '&data-engine-contract=1'
+    + '&data-installation-platform=gtm&data-adapter-version=' + ADAPTER_VERSION;
   injectScript(url, function () {
     // Download completion is separate from configuration/GVL/CMP readiness.
     settle(owner, 'loaded');
+    queueObservation(owner);
   }, function () {
     log('Cybexo CMP: Loader failed. Consent remains denied; reload to retry.');
     settle(owner, 'failed');
-  }, 'cybexo-cmp-' + settingsId);
+  }, 'cybexo-cmp-' + settingsId + '-' + ENGINE_RELEASE);
 })();
 
 
@@ -426,7 +534,7 @@ ___WEB_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://cmp.cybexo.com/loader.js*"
+                "string": "https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js*"
               }
             ]
           }
@@ -488,6 +596,240 @@ ___WEB_PERMISSIONS___
                     "boolean": false
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "CybexoConsentEngine.contractVersion"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "CybexoConsentEngine.getSnapshot"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "CybexoConsentEngine.subscribe"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "setTimeout"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "clearTimeout"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "cybexoCmpInstallationV1"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
               }
             ]
           }
@@ -519,6 +861,9 @@ ___TESTS___
 scenarios:
 - name: Native callback updates four keys and safely replaces partial input
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     var callback;
     mock('injectScript', function (url, success) { success(); });
     mock('setInWindow', function (name, fn) { callback = fn; return true; });
@@ -531,6 +876,9 @@ scenarios:
     assertApi('gtagSet').wasCalledWith('developer_id.dZTNmYW', true);
 - name: Pending duplicate callers both succeed exactly once after one load
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     var owner;
     var loaded;
     var failed;
@@ -559,6 +907,9 @@ scenarios:
     assertApi('gtmOnFailure').wasNotCalled();
 - name: Pending duplicate failure denies and settles both callers once
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     var owner;
     var loaded;
     var failed;
@@ -588,19 +939,28 @@ scenarios:
     assertApi('updateConsentState').wasCalledWith({ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
 - name: Loaded duplicate leaves established consent unchanged
   code: |-
-    mockObject('templateStorage', {getItem:function () { return {settingsId:'CYB-fixture001',status:'loaded',waiters:[]}; }});
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
+    mockObject('templateStorage', {getItem:function () { return {settingsId:'CYB-fixture001',engineRelease:'1.5.40-23fc15424d75',adapterVersion:'gtm-v1.0.0',status:'loaded',waiters:[]}; }});
     runCode({settingsId:'CYB-fixture001'});
     assertApi('setDefaultConsentState').wasNotCalled();
     assertApi('updateConsentState').wasNotCalled();
     assertApi('injectScript').wasNotCalled();
 - name: Empty identity writes denied baseline even with configured grants
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     mockObject('templateStorage', {getItem:function () {}});
     runCode({settingsId:'  ',globalDefaultsJson:'{"ad_storage":"granted"}'});
     assertApi('setDefaultConsentState').wasCalledWith({ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500});
     assertApi('injectScript').wasNotCalled();
 - name: Malformed JSON is denied rather than partially granted
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     mockObject('templateStorage', {getItem:function () {},setItem:function () {}});
     mock('setInWindow',function () { return true; });
     mock('injectScript',function () {});
@@ -608,6 +968,9 @@ scenarios:
     assertApi('setDefaultConsentState').wasCalledWith({ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500});
 - name: Conflicting identity fails denied and blocks a later loader success
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     var owner;
     var loaded;
     var failed;
@@ -640,6 +1003,9 @@ scenarios:
     assertApi('updateConsentState').wasCalledWith({ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
 - name: Existing callback is never overwritten and denies failed ownership
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     mockObject('templateStorage',{getItem:function () {}});
     var override;
     mock('setInWindow',function (name,fn,replace) { override=replace;return false; });
@@ -649,12 +1015,59 @@ scenarios:
     assertApi('injectScript').wasNotCalled();
 - name: Retired NXG identity is denied and never loaded or silently renamed
   code: |-
+    mock('copyFromWindow', function () {});
+    mock('callInWindow', function () {});
+    mock('callLater', function () {});
     mockObject('templateStorage',{getItem:function () {}});
     runCode({settingsId:'NXG-kwol0d503y',globalDefaultsJson:'{"ad_storage":"granted","analytics_storage":"granted","ad_user_data":"granted","ad_personalization":"granted"}'});
     assertApi('setDefaultConsentState').wasCalledWith({ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500});
     assertApi('updateConsentState').wasCalledWith({ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
     assertApi('injectScript').wasNotCalled();
     assertApi('setInWindow').wasNotCalled();
+
+
+- name: Existing engine is rejected before native defaults or callback takeover
+  code: |-
+    mockObject('templateStorage', {getItem:function () {}});
+    mock('copyFromWindow', function () { return 1; });
+    runCode({settingsId:'CYB-fixture001'});
+    assertApi('gtmOnFailure').wasCalled();
+    assertApi('setDefaultConsentState').wasNotCalled();
+    assertApi('updateConsentState').wasNotCalled();
+    assertApi('setInWindow').wasNotCalled();
+    assertApi('injectScript').wasNotCalled();
+- name: Delayed v1 observation reads latest withdrawal without another native write
+  code: |-
+    var owner;
+    var version;
+    var loaded;
+    var listener;
+    var queue=[];
+    var current={schema:'cybexo.consent.v1',revision:1,decisionRevision:0,state:'ready',pending:false,decisionMade:false,
+      google:{enabled:true,owner:'native-gtm',signals:null},
+      identity:{contractVersion:1,appId:'CYB-fixture001',engineRelease:'1.5.40-23fc15424d75',engineVersion:'1.5.40',
+        buildId:'production.20261009.031052.runlocal.65b35513',installationPlatform:'gtm',adapterVersion:'gtm-v1.0.0',googleOwner:'native-gtm'}};
+    mockObject('templateStorage', {getItem:function () { return owner; },setItem:function (key,value) { owner=value; }});
+    mock('copyFromWindow', function () { return version; });
+    mock('setInWindow', function () { return true; });
+    mock('injectScript', function (url,success) { loaded=success; });
+    mock('callLater', function (fn) { queue.push(fn); });
+    mock('callInWindow', function (path,fn) {
+      if(path==='CybexoConsentEngine.getSnapshot') return current;
+      if(path==='CybexoConsentEngine.subscribe') { listener=fn;fn({type:'initial',snapshot:current});return function () {}; }
+    });
+    runCode({settingsId:'CYB-fixture001',regionList:''});
+    version=1;loaded();queue.shift()();queue.shift()();
+    current.revision=2;current.decisionRevision=1;
+    listener({type:'committed',snapshot:current});
+    current.revision=3;current.decisionRevision=2;current.lastDecisionAction='reject-all';
+    listener({type:'committed',snapshot:current});
+    assertThat(queue.length).isEqualTo(1);
+    queue.shift()();
+    assertThat(owner.snapshot.revision).isEqualTo(3);
+    assertThat(owner.snapshot.decisionRevision).isEqualTo(2);
+    assertThat(owner.snapshot.lastDecisionAction).isEqualTo('reject-all');
+    assertApi('updateConsentState').wasNotCalled();
 
 
 ___NOTES___

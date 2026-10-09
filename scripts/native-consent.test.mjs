@@ -17,6 +17,7 @@ function setup({collision=false}={}){
   setDefaultConsentState:s=>calls.push(['default',clone(s)]),
   updateConsentState:s=>calls.push(['update',clone(s)]),
   setInWindow:(key,fn,override)=>{calls.push(['register',key,override]);if(globals[key]!==undefined&&!override)return false;globals[key]=fn;return true;},
+  copyFromWindow:()=>undefined,callInWindow:()=>undefined,callLater:()=>{},
   templateStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},
   JSON:{parse:s=>{parseInputs.push(s);try{return JSON.parse(s);}catch{return undefined;}},stringify:s=>{try{return JSON.stringify(s);}catch{return undefined;}}},
   getType:v=>v===null?'null':Array.isArray(v)?'array':typeof v,
@@ -31,7 +32,7 @@ test('locked attribution and denied defaults precede callback and one asynchrono
  const h=setup();h.run({developerId:'override',loaderUrl:'https://evil.test/'});
  assert.deepEqual(h.calls.map(c=>c[0]),['developer','default','register','inject']);
  assert.deepEqual(h.calls[0],['developer','developer_id.dZTNmYW',true]);assert.deepEqual(h.calls[1][1],{...denied,wait_for_update:500});
- const url=new URL(h.calls[3][1]);assert.equal(url.origin,'https://cmp.cybexo.com');assert.equal(url.pathname,'/loader.js');assert.equal(url.searchParams.get('delivery'),'2');assert.equal(url.searchParams.get('data-consent-mode'),'off');assert.equal(url.searchParams.get('data-developer-id'),'dZTNmYW');assert.equal(h.calls[3][2],'cybexo-cmp-CYB-fixture001');
+ const url=new URL(h.calls[3][1]);assert.equal(url.origin,'https://cmp.cybexo.com');assert.equal(url.pathname,'/releases/1.5.40-23fc15424d75/loader.js');assert.equal(url.searchParams.has('delivery'),false);assert.equal(url.searchParams.get('data-engine-release'),'1.5.40-23fc15424d75');assert.equal(url.searchParams.get('data-engine-contract'),'1');assert.equal(url.searchParams.get('data-installation-platform'),'gtm');assert.equal(url.searchParams.get('data-adapter-version'),'gtm-v1.0.0');assert.equal(url.searchParams.get('data-consent-mode'),'off');assert.equal(url.searchParams.get('data-developer-id'),'dZTNmYW');assert.equal(h.calls[3][2],'cybexo-cmp-CYB-fixture001-1.5.40-23fc15424d75');
 });
 test('accept granular analytics-off and withdrawal use native updates',()=>{
  const h=setup();h.run();h.pending[0].success();for(const s of [granted,{...granted,ad_user_data:'denied'},{...granted,analytics_storage:'denied'},denied])assert.equal(h.globals.cybexoGtmConsentUpdate(s),true);
@@ -87,7 +88,7 @@ test('wait is finite and bounded; permitted values are retained',()=>{
  for(const wait of [500,750,10000,'750']){const h=setup();h.run({waitForUpdateMs:wait});assert.equal(h.calls[1][1].wait_for_update,Number(wait));}
 });
 test('valid generated CYB identities retain exact value and fixed endpoints',()=>{
- for(const id of ['CYB-kwol0d503y','CYB-0000000000','CYB-zzzzzzzzzz']){const h=setup();h.run({settingsId:' '+id+' '});const url=new URL(h.calls.find(c=>c[0]==='inject')[1]);assert.equal(url.searchParams.get('data-settings-id'),id);assert.equal(url.searchParams.get('data-assets-url'),'https://cmp.cybexo.com');assert.equal(url.searchParams.get('data-cdn-url'),'https://edge.cybexo.com');}
+ for(const id of ['CYB-kwol0d503y','CYB-0000000000','CYB-zzzzzzzzzz']){const h=setup();h.run({settingsId:' '+id+' '});const url=new URL(h.calls.find(c=>c[0]==='inject')[1]);assert.equal(url.searchParams.get('data-settings-id'),id);assert.equal(url.searchParams.get('data-assets-url'),'https://cmp.cybexo.com/releases/1.5.40-23fc15424d75');assert.equal(url.searchParams.get('data-cdn-url'),'https://edge.cybexo.com');}
 });
 for(const id of ['NXG-kwol0d503y','NXG-ASCEND-S11-WEB-EN','CYB-','CYB-fixture','CYB-01234567890','CYB-012345678A','cyb-0123456789','CYB-01234-6789','CYB-0123456789&data-assets-url=https://evil.test/','CYB-01234/6789','CYB-01234é6789'])test('retired or malformed identity denies without injection: '+id,()=>{
  const h=setup();h.run({settingsId:id,globalDefaultsJson:JSON.stringify(granted)});assert.deepEqual(h.calls.find(c=>c[0]==='default')[1],{...denied,wait_for_update:500});assert.deepEqual(h.calls.filter(c=>c[0]==='update'),[['update',denied]]);assert.equal(h.pending.length,0);assert.ok(!h.calls.some(c=>c[0]==='register'));assert.deepEqual(outcomes(h),[['failure',1]]);
@@ -101,8 +102,8 @@ test('absent empty and unserializable consent input never parses undefined',()=>
 test('fields and permissions expose only necessary endpoints and APIs',()=>{
  const params=JSON.parse(part('TEMPLATE_PARAMETERS'));assert.deepEqual(params.map(p=>p.name),['settingsId','globalDefaultsJson','regionList','regionDefaultsJson','waitForUpdateMs']);
  const permissions=JSON.parse(part('WEB_PERMISSIONS'));const byId=id=>permissions.find(p=>p.instance.key.publicId===id).instance;
- assert.deepEqual(byId('inject_script').param[0].value.listItem.map(x=>x.string),['https://cmp.cybexo.com/loader.js*']);
+ assert.deepEqual(byId('inject_script').param[0].value.listItem.map(x=>x.string),['https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js*']);
  for(const item of byId('access_consent').param[0].value.listItem)assert.deepEqual(item.mapValue.slice(1).map(x=>x.boolean),[false,true]);
- const access=byId('access_globals').param[0].value.listItem;assert.equal(access.length,1);assert.equal(access[0].mapValue[0].string,'cybexoGtmConsentUpdate');assert.deepEqual(access[0].mapValue.slice(1).map(x=>x.boolean),[true,true,false]);
- assert.ok(!code.includes("require('callInWindow')"));assert.ok(!code.includes("require('callLater')"));assert.ok(code.includes("require('updateConsentState')"));
+ const access=byId('access_globals').param[0].value.listItem;assert.equal(access.length,7);assert.equal(access[0].mapValue[0].string,'cybexoGtmConsentUpdate');assert.deepEqual(access[0].mapValue.slice(1).map(x=>x.boolean),[true,true,false]);
+ assert.ok(code.includes("require('callInWindow')"));assert.ok(code.includes("require('callLater')"));assert.ok(code.includes("require('updateConsentState')"));
 });
