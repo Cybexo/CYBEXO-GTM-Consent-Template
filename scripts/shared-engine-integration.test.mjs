@@ -52,7 +52,7 @@ else {
    getType:value=>value===null?'null':Array.isArray(value)?'array':typeof value,encodeUriComponent:encodeURIComponent
   };
   function run(){vm.runInNewContext(template,{require:name=>apis[name],data:{settingsId:'CYB-fixture001',gtmOnSuccess(){},gtmOnFailure:()=>assert.fail('template rejected actual shared engine')}});}
-  function load(){const el=w.document.createElement('script');el.src=early?'https://cmp.cybexo.com/loader.js':loads[0].url;
+  function load(){const el=w.document.createElement('script');el.src=early?'https://cmp.cybexo.com/loader.js?data-gtm-bootstrap=on':loads[0].url;
    if(early){el.id='cybexo-cmp';el.setAttribute('data-settings-id','CYB-fixture001');el.setAttribute('data-gtm-bootstrap','on');if(wordpress)el.setAttribute('data-host-platform','wordpress');}
    el.setAttribute('data-consent-records','off');el.setAttribute('data-interaction-analytics','off');Object.defineProperty(w.document,'currentScript',{value:el,configurable:true});w.eval(engineCode);Object.defineProperty(w.document,'currentScript',{value:null,configurable:true});if(!early)loads[0].success();}
   function flush(){for(let i=0;later.length;i++){assert.ok(i<100,'no self-polling');later.shift()();}}

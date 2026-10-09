@@ -6,8 +6,10 @@ This is an unpublished recovery candidate. The ordinary template establishes nat
 
 ```html
 <script id="cybexo-cmp" data-settings-id="YOUR_CYB_APP_ID"
-  data-gtm-bootstrap="on" src="https://cmp.cybexo.com/loader.js"></script>
+  data-gtm-bootstrap="on" src="https://cmp.cybexo.com/loader.js?data-gtm-bootstrap=on"></script>
 ```
+
+Keep the stable startup query in the script URL. It selects the native GTM startup contract and avoids old browser cache entries for the bare loader URL, which were historically served with a 31-day lifetime. This is the same shared file and build; the query is not a release number and must not change per release. Current responses revalidate on subsequent page loads.
 
 Use the actual App ID from the dashboard, matching the template tag. Keep this script synchronous: no `async`, `defer` or `type="module"`; allow it under the site's CSP. The `on` opt-in reserves the native GTM installer/owner and exposes TCF immediately. It starts no configuration, banner or Google command until the template establishes native defaults, registers its callback and resumes the same loader. The template then skips another injection. No separate bootstrap URL, engine version, hash or inline program is required.
 
