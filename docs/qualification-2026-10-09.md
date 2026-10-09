@@ -5,10 +5,12 @@ The common-loader template is deployed in the dedicated `GTM-TBQSTS2P` container
 The qualification host is `cybexo-web-qualification.pages.dev`. Its Basic, Advanced, actual regional TCF path and template-only fallback were exercised. All other platform wiring remains outside this milestone.
 
 - 150 local source cases, four integrations with the exact frozen production loader, and 11 tests in Google's template editor passed.
-- Twenty-one retained browser states checked native defaults/updates, saved choices, reject, accept, unsaved cancellation, Analytics withdrawal, purpose 1/3/4 restrictions, Google vendor refusal, early reservation, fallback injection and startup failures.
+- Twenty-four retained browser states checked native defaults/updates, saved choices, reject, accept, unsaved cancellation, Analytics withdrawal, purpose 1/3/4 restrictions, Google vendor refusal, early reservation, fallback injection and startup failures.
 - Independent TC decoding checked CMP 471, policy 5, GVL 179, service-specific scope and Google vendor disclosure against the browser API.
-- Three permitted Google requests returned HTTP 204. The Advanced probe was also visible in GA4 DebugView with its matching page and session. Tag Assistant independently showed denied defaults and restored Analytics denial.
-- Nine completed choices matched nine durable consent records, reporting receipts and archive objects. Twelve network attempts included three identical retries without duplicate decisions.
+- Four permitted Google requests returned HTTP 204. The Advanced probe was also visible in GA4 DebugView with its matching page and session. Tag Assistant independently showed denied defaults and restored Analytics denial.
+- Ten completed choices matched ten durable consent records, reporting receipts and archive objects. Thirteen network attempts included three identical retries without duplicate decisions.
+
+A fresh event requested after a saved Purpose 4 refusal carried `npa=1` and the updated Google consent encoding while Analytics remained permitted. Google can batch an earlier event until after later UI changes; the audit distinguishes event creation order from network send time.
 
 The early script uses the stable `?data-gtm-bootstrap=on` query. A real retained browser cache otherwise served an old bare-loader response. The stable query loads the same shared artifact and avoids that historical entry; it is not a per-platform build/version. Follow the exact [short installation](installation.md#tcf-page-setup).
 
