@@ -31,7 +31,7 @@ test('locked attribution and denied defaults precede callback and one asynchrono
  const h=setup();h.run({developerId:'override',loaderUrl:'https://evil.test/'});
  assert.deepEqual(h.calls.map(c=>c[0]),['developer','default','register','inject']);
  assert.deepEqual(h.calls[0],['developer','developer_id.dZTNmYW',true]);assert.deepEqual(h.calls[1][1],{...denied,wait_for_update:500});
- const url=new URL(h.calls[3][1]);assert.equal(url.origin,'https://cmp.cybexo.com');assert.equal(url.pathname,'/loader.js');assert.equal(url.searchParams.get('data-consent-mode'),'off');assert.equal(url.searchParams.get('data-developer-id'),'dZTNmYW');assert.equal(h.calls[3][2],'cybexo-cmp-CYB-fixture001');
+ const url=new URL(h.calls[3][1]);assert.equal(url.origin,'https://cmp.cybexo.com');assert.equal(url.pathname,'/loader.js');assert.equal(url.searchParams.get('delivery'),'2');assert.equal(url.searchParams.get('data-consent-mode'),'off');assert.equal(url.searchParams.get('data-developer-id'),'dZTNmYW');assert.equal(h.calls[3][2],'cybexo-cmp-CYB-fixture001');
 });
 test('accept granular analytics-off and withdrawal use native updates',()=>{
  const h=setup();h.run();h.pending[0].success();for(const s of [granted,{...granted,ad_user_data:'denied'},{...granted,analytics_storage:'denied'},denied])assert.equal(h.globals.cybexoGtmConsentUpdate(s),true);

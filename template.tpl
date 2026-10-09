@@ -202,7 +202,7 @@ function settle(owner, status) {
     return;
   }
   templateStorage.setItem(OWNER, owner);
-  var url = LOADER + '?data-settings-id=' + encodeUriComponent(settingsId)
+  var url = LOADER + '?delivery=2&data-settings-id=' + encodeUriComponent(settingsId)
     + '&data-cdn-url=' + encodeUriComponent(CDN)
     + '&data-assets-url=' + encodeUriComponent(ASSETS)
     + '&data-developer-id=' + DEVELOPER_ID + '&data-consent-mode=off';

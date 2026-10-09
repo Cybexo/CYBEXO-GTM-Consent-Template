@@ -34,3 +34,7 @@ This template release accepts only `CYB-` App IDs. Before updating an installati
 [Developer documentation](https://developer.cybexo.com/) · [CYBEXO](https://cybexo.com/)
 
 This repository uses the [Apache License 2.0](LICENSE). The publisher bootstrap is the existing CYBEXO Web CMP artifact; its exact source and provenance are recorded in [publisher/README.md](publisher/README.md).
+
+## Runtime update delivery
+
+This release moves the managed loader to a revalidating delivery URL. Update the template, preview the existing consent tag and publish the container so returning browsers use the new URL. Keep the same App ID, tag settings and consent initialization trigger. Saved choices are retained; already-open pages take up the update on a normal navigation or reload.
