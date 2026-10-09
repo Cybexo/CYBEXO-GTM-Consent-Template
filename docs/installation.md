@@ -2,7 +2,7 @@
 
 ## TCF page setup
 
-This is an unpublished recovery candidate. The ordinary template establishes native Google defaults before injecting the single public `https://cmp.cybexo.com/loader.js`; the loader installs the TCF stub when it executes. Consumers that run earlier need the same loader to execute synchronously before them and before the GTM container:
+This source is qualified in the dedicated test container; public Gallery promotion is pending. The ordinary template establishes native Google defaults before injecting the single public `https://cmp.cybexo.com/loader.js`; the loader installs the TCF stub when it executes. Consumers that run earlier need the same loader to execute synchronously before them and before the GTM container:
 
 ```html
 <script id="cybexo-cmp" data-settings-id="YOUR_CYB_APP_ID"
@@ -17,7 +17,7 @@ Consent Initialization orders GTM tags, not scripts that ran before GTM. Keep Go
 
 For WordPress configured to use GTM, let the compatible plugin manage its own early bootstrap and host declaration; do not add a competing manual installer. Only `data-gtm-bootstrap="on"` is supported when the attribute is present and nonempty; a typo fails instead of falling back to Direct ownership. The files in `publisher/` retain historical bootstrap evidence and are not the new customer installation program.
 
-Local component tests cover this contract. Deploying the shared build, wiring a real platform, GTM sandbox compilation and browser ordering verification are still deferred. Do not use this unpublished candidate as a production installation claim.
+The shared 1.5.42 artifact, dedicated-container publication, Google sandbox tests and live browser ordering passed the [October 9 qualification](qualification-2026-10-09.md). This does not qualify every customer container or a public Gallery revision. WordPress wiring is a separate milestone.
 
 ## Template fields
 
@@ -63,7 +63,7 @@ The template reads v1 snapshots only to observe the shared engine. It never infe
 - Accept, reject and change purpose-specific/Analytics choices; confirm the current native consent values after each action and after reload.
 - Verify delivery for permitted Google events and the intended behavior of tags after withdrawal.
 - Test blocked loader/configuration/GVL delivery. A script-load success in GTM does not mean the CMP finished loading, and a timer is not a readiness check.
-- For TCF, confirm synchronous stub ping before loader execution and same-document listener delivery after recovery. Check repeated iframe listener responses and listener removal where those integrations are used.
+- For TCF, confirm synchronous stub ping after the early loader executes and before GTM or other TCF consumers execute and same-document listener delivery after recovery. Check repeated iframe listener responses and listener removal where those integrations are used.
 - Confirm one loader and one consent owner when the tag executes repeatedly.
 
 Gallery updates are offered to existing workspaces for review. Review and accept the intended template update, test the workspace, then publish the container. A repository update does not update an already-published customer container automatically.

@@ -1,19 +1,19 @@
 # CYBEXO GTM Consent Template
 
-This is an unpublished shared-engine recovery candidate. Import, site qualification and Gallery/container promotion remain separate gates.
+This shared-engine template passed the dedicated GTM qualification on October 9, 2026, using the common Web CMP 1.5.42 build. It is published in the dedicated qualification container; the public Gallery has not been updated to this source. See [qualification scope](docs/qualification-2026-10-09.md).
 
-Install CYBEXO CMP through the Google Tag Manager Community Template Gallery. The template sets Google Consent Mode defaults and updates the four Google consent values when a visitor makes or changes a choice.
+For this reviewed source, import `template.tpl` into a controlled GTM workspace. Use the Community Template Gallery once the matching revision is published there. The template sets Google Consent Mode defaults and updates the four Google consent values when a visitor makes or changes a choice.
 
 ## Install
 
 1. Copy your **CYB App ID** (shown as Settings ID in the dashboard) from the CYBEXO dashboard and keep **Consent Mode enabled** for that app.
 2. Check the [early TCF startup requirement](docs/installation.md#tcf-page-setup) before adopting this candidate on a TCF site.
-3. In GTM, open **Templates → Search Gallery**, find **Cybexo CMP**, and add the template. Create a tag using it and enter your **CYB App ID**.
+3. In GTM, import this reviewed `template.tpl` under **Templates → New → Import**. Create a tag using it and enter your **CYB App ID**. A future Gallery installation must be checked against the matching published revision.
 4. Keep the denied global defaults unless your consent configuration requires a different setting. Regional overrides are optional. See [field and region guidance](docs/installation.md#template-fields).
 5. Select **Consent Initialization – All Pages** as the tag's trigger.
 6. Check fresh visits, saved choices, acceptance, mixed choices and withdrawal in Tag Assistant before publishing the container. Confirm that the template version in your workspace is the version you intend to publish.
 
-A GTM-only installation cannot expose TCF before GTM and its injected loader execute. The early native reservation uses that same public loader with `data-gtm-bootstrap="on"`. Its local component contract is implemented; delivery, GTM compilation and site qualification remain required before publication.
+A GTM-only installation cannot expose TCF before GTM and its injected loader execute. The early native reservation uses that same public loader with `data-gtm-bootstrap="on"`. The shared 1.5.42 build, Google sandbox compilation and dedicated-site ordering were verified. Each customer container still needs its own preview and publication checks.
 
 Use one CYBEXO consent installation per page. Do not add a second direct CMP loader or a separate `gtag('consent', ...)` setup alongside this template. See [complete installation and verification guidance](docs/installation.md).
 

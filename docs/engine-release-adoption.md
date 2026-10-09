@@ -1,6 +1,6 @@
 # Shared engine delivery
 
-This is the local GTM recovery source candidate. It has not been published to the Gallery or adopted by a GTM container. The Web source, atomic shared release delivery, early TCF startup, GTM import and site qualification gates remain separate.
+This source was imported, compiled, published and qualified in the dedicated GTM container on October 9, 2026, against the shared Web CMP 1.5.42 artifact. Public Gallery promotion remains pending. See [the exact qualification scope](qualification-2026-10-09.md).
 
 | Contract | Value |
 | --- | --- |
@@ -29,7 +29,7 @@ Download completion is not readiness. `callLater` coalesces observations and rea
 
 ## Early TCF and qualification
 
-The ordinary template path injects the loader after GTM starts. It cannot supply a TCF API to consumers that already ran outside GTM. The same public loader supports `data-gtm-bootstrap="on"` for an early synchronous reservation. Its App/host/installer/owner diagnostic is checked before native defaults. The loader's resume function rechecks current context and callback ownership, starts at most once and reports acceptance rather than readiness. No timers, separate customer bootstrap URL or long inline program are introduced. Local component cases cover waiting, delayed handoff, mismatch, duplicate and failure behavior; actual platform wiring and qualification are deferred. See [installation guidance](installation.md#tcf-page-setup).
+The ordinary template path injects the loader after GTM starts. It cannot supply a TCF API to consumers that already ran outside GTM. The same public loader supports `data-gtm-bootstrap="on"` for an early synchronous reservation. Its App/host/installer/owner diagnostic is checked before native defaults. The loader's resume function rechecks current context and callback ownership, starts at most once and reports acceptance rather than readiness. No timers, separate customer bootstrap URL or long inline program are introduced. Local component cases cover waiting, delayed handoff, mismatch, duplicate and failure behavior. Dedicated GTM browser qualification is complete; WordPress host wiring and other customer containers remain separate. See [installation guidance](installation.md#tcf-page-setup).
 
 ## Source validation and promotion
 
