@@ -1,11 +1,11 @@
 {
   "schema": "cybexo.engine.release.v1",
-  "id": "1.5.40-23fc15424d75",
-  "version": "1.5.40",
-  "build": "production.20261009.031052.runlocal.65b35513",
-  "commit": "65b35513",
+  "id": "1.5.41-dc8923e48269",
+  "version": "1.5.41",
+  "build": "production.20261009.070006.runlocal.04a91543",
+  "commit": "04a91543",
   "contractVersion": 1,
-  "path": "/releases/1.5.40-23fc15424d75/",
+  "path": "/releases/1.5.41-dc8923e48269/",
   "files": [
     {
       "name": "111ng.svg",
@@ -34,14 +34,14 @@
     {
       "name": "cybexo-cmp-build.json",
       "bytes": 619,
-      "sha256": "45c534b0c7f208d036065e0a2e22da5531b13169a7a9f4bd8279a51699a1b43c",
-      "integrity": "sha384-AkeR1bw0d2nS7jYbsQbpDfngQwbQqxD6fhY6sT/vswilT2T3+FVzA8rxTiOMjrya"
+      "sha256": "2d153e2d31db28cc4581858d4e322613b61f249869ea41b8b17a5c19808c8f1c",
+      "integrity": "sha384-CwJS1dUUsFrsRhCiRsobRpq874N/0SmKSvT+pd9tZSXlJsDnxzZCMm3Ia/5bKFG0"
     },
     {
       "name": "loader.js",
-      "bytes": 3037317,
-      "sha256": "fa8e4e31806ba309c52a281f785eb4c5e6576dcbeb01aa123889b80860098fee",
-      "integrity": "sha384-/D5hq5yEPXJ230lhCUm/Ow/G12XAJPrfHvfexhX3evtww8qqwvyVuqr3+9slEp2Z"
+      "bytes": 3035792,
+      "sha256": "d0b9492e1c92caccbee3df1e5aab538b83091f67d9960a1d971defca1d4c8842",
+      "integrity": "sha384-l+2WepGVwI6LQ6A8X3wsCiBL3phFxendxHjU8DjOae7MD6tQxRRq/F/+3Ukc0Rbv"
     },
     {
       "name": "ng.svg",
@@ -51,9 +51,9 @@
     },
     {
       "name": "preview-loader.js",
-      "bytes": 2931225,
-      "sha256": "99db8f1cb874f845690e1baa0b21aa02331c1aea668bc2e40e5b00673d1d4c31",
-      "integrity": "sha384-SwxI0QYnw27WTCqeARVbCQ+VU7JLj+Ulgjh8z2fBa/yXVaJi74u4QZ1fY23BLywK"
+      "bytes": 2931023,
+      "sha256": "9bc1b80abec1cc64d321f90dc403611f97dfaf50d3760e58f72e2a4b847a3398",
+      "integrity": "sha384-RKHpxjhQJtZclVvfaMDgsgnccDdoLhsdIMY4ofZwd5yQBnMJjbMQ/I3d/UjYvHdv"
     },
     {
       "name": "tcf-bootstrap.js",

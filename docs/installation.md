@@ -17,10 +17,10 @@ Alternatively, host the exact [publisher/tcf-bootstrap.js](../publisher/tcf-boot
 <!-- Your normal Google Tag Manager container snippet follows. -->
 ```
 
-Deploy the file before adding this reference. The selected CYBEXO URL is `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/tcf-bootstrap.js`; an external reference also depends on that request being allowed by the site's CSP and successfully delivered. For that cross-origin URL, use the exact published integrity value and anonymous CORS:
+Deploy the file before adding this reference. The selected CYBEXO URL is `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/tcf-bootstrap.js`; an external reference also depends on that request being allowed by the site's CSP and successfully delivered. For that cross-origin URL, use the exact published integrity value and anonymous CORS:
 
 ```html
-<script src="https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/tcf-bootstrap.js"
+<script src="https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/tcf-bootstrap.js"
   integrity="sha384-XJ+QMWVaYoQHdg4EzFO01XDXyOMdzFWKn0c35kM/iN2lT7YE3MjU2LBA4Q2YvTLn"
   crossorigin="anonymous"></script>
 ```
@@ -55,7 +55,7 @@ Migrate a legacy App ID before updating to this template release. Complete a sup
 
 ## Consent ownership
 
-This template sets native defaults and registers the native update callback before loading CYBEXO CMP. It loads `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js` with `data-consent-mode=off`, which disables the loader's separate `gtag` command path. The template's native bridge remains responsible for publishing validated choices to GTM. This flag does not mean that Google consent is disabled for this integration. Keep Consent Mode enabled in the app's dashboard configuration: the template does not override an app-level disabled setting.
+This template sets native defaults and registers the native update callback before loading CYBEXO CMP. It loads `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/loader.js` with `data-consent-mode=off`, which disables the loader's separate `gtag` command path. The template's native bridge remains responsible for publishing validated choices to GTM. This flag does not mean that Google consent is disabled for this integration. Keep Consent Mode enabled in the app's dashboard configuration: the template does not override an app-level disabled setting.
 
 Web CMP 1.5.38 and later also expose `enableAdvertiserConsentMode: false` while the native GTM bridge is present, so automatic TCF inference cannot overwrite the bridge's saved values when the settings dialog opens. The standard TCF API, disclosures and lifecycle events remain available. Do not separately set `window.gtag_enable_tcf_support = true` on these pages; that would explicitly introduce a second Google consent writer. Direct Web installations retain their own inference configuration.
 

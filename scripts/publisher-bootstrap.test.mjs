@@ -33,7 +33,7 @@ function fixture({body = true, existing, locator = false, installed = false} = {
   return {window, run, listeners, domEvents, append, appendCount: () => appendCount};
 }
 
-test('publisher artifact is the selected Web 1.5.40 bootstrap (unchanged bytes) and inline bytes match', () => {
+test('publisher artifact is the selected Web 1.5.41 bootstrap (unchanged bytes) and inline bytes match', () => {
   assert.equal(createHash('sha256').update(artifact).digest('hex'), expectedHash);
   assert.equal(Buffer.byteLength(artifact), 1236);
   assert.equal(inline.match(/<script>\n([\s\S]*)<\/script>/)?.[1], artifact);

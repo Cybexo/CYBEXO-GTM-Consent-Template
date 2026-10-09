@@ -92,8 +92,8 @@ const getType = require('getType');
 const encodeUriComponent = require('encodeUriComponent');
 
 var KEYS = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
-var ENGINE_RELEASE = '1.5.40-23fc15424d75';
-var ENGINE_BUILD = 'production.20261009.031052.runlocal.65b35513';
+var ENGINE_RELEASE = '1.5.41-dc8923e48269';
+var ENGINE_BUILD = 'production.20261009.070006.runlocal.04a91543';
 var ADAPTER_VERSION = 'gtm-v1.0.0';
 var ASSETS = 'https://cmp.cybexo.com/releases/' + ENGINE_RELEASE;
 var LOADER = ASSETS + '/loader.js';
@@ -156,7 +156,7 @@ function matchesIdentity(snapshot, owner) {
   var identity = snapshot && snapshot.identity;
   return snapshot && snapshot.schema === 'cybexo.consent.v1' && identity &&
     identity.contractVersion === 1 && identity.appId === owner.settingsId &&
-    identity.engineRelease === ENGINE_RELEASE && identity.engineVersion === '1.5.40' && identity.buildId === ENGINE_BUILD &&
+    identity.engineRelease === ENGINE_RELEASE && identity.engineVersion === '1.5.41' && identity.buildId === ENGINE_BUILD &&
     identity.installationPlatform === 'gtm' && identity.adapterVersion === ADAPTER_VERSION &&
     ((identity.googleOwner === 'native-gtm' && snapshot.google && snapshot.google.owner === 'native-gtm') ||
       (identity.googleOwner === 'none' && snapshot.google && snapshot.google.owner === 'none' && snapshot.google.enabled === false));
@@ -527,7 +527,7 @@ ___WEB_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js*"
+                "string": "https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/loader.js*"
               }
             ]
           }
@@ -857,7 +857,7 @@ scenarios:
     mock('copyFromWindow', function () {});
     mock('callInWindow', function () {});
     mock('callLater', function () {});
-    mockObject('templateStorage', {getItem:function () { return {settingsId:'CYB-fixture001',engineRelease:'1.5.40-23fc15424d75',adapterVersion:'gtm-v1.0.0',status:'loaded',waiters:[]}; }});
+    mockObject('templateStorage', {getItem:function () { return {settingsId:'CYB-fixture001',engineRelease:'1.5.41-dc8923e48269',adapterVersion:'gtm-v1.0.0',status:'loaded',waiters:[]}; }});
     runCode({settingsId:'CYB-fixture001'});
     assertApi('setDefaultConsentState').wasNotCalled();
     assertApi('updateConsentState').wasNotCalled();
@@ -960,8 +960,8 @@ scenarios:
     var queue=[];
     var current={schema:'cybexo.consent.v1',revision:1,decisionRevision:0,state:'ready',pending:false,decisionMade:false,
       google:{enabled:true,owner:'native-gtm',signals:null},
-      identity:{contractVersion:1,appId:'CYB-fixture001',engineRelease:'1.5.40-23fc15424d75',engineVersion:'1.5.40',
-        buildId:'production.20261009.031052.runlocal.65b35513',installationPlatform:'gtm',adapterVersion:'gtm-v1.0.0',googleOwner:'native-gtm'}};
+      identity:{contractVersion:1,appId:'CYB-fixture001',engineRelease:'1.5.41-dc8923e48269',engineVersion:'1.5.41',
+        buildId:'production.20261009.070006.runlocal.04a91543',installationPlatform:'gtm',adapterVersion:'gtm-v1.0.0',googleOwner:'native-gtm'}};
     mockObject('templateStorage', {getItem:function () { return owner; },setItem:function (key,value) { owner=value; }});
     mock('copyFromWindow', function () { return version; });
     mock('setInWindow', function () { return true; });

@@ -4,16 +4,16 @@ This is the local WEI-04 GTM source candidate. It has not been published to the 
 
 | Selection | Value |
 | --- | --- |
-| Engine release | `1.5.40-23fc15424d75` |
-| Engine source | `65b35513` |
-| Engine build | `production.20261009.031052.runlocal.65b35513` |
+| Engine release | `1.5.41-dc8923e48269` |
+| Engine source | `04a91543` |
+| Engine build | `production.20261009.070006.runlocal.04a91543` |
 | Engine contract | `1` |
 | Installation platform | `gtm` |
 | Adapter identity | `gtm-v1.0.0` |
 | Google owner | `native-gtm` when enabled; `none` when app-level emission is disabled |
-| Loader | `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/loader.js` |
-| Bootstrap | `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75/tcf-bootstrap.js` |
-| Assets | `https://cmp.cybexo.com/releases/1.5.40-23fc15424d75` |
+| Loader | `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/loader.js` |
+| Bootstrap | `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269/tcf-bootstrap.js` |
+| Assets | `https://cmp.cybexo.com/releases/1.5.41-dc8923e48269` |
 
 The template passes the App ID, edge configuration URL, matching asset URL, developer ID, `data-consent-mode=off`, and all four release/contract/platform/adapter metadata fields as loader query parameters. Its injection permission is restricted to the selected loader. There is no editable runtime URL, mutable fallback, version selector, or automatic latest-release selection. Release changes require reviewed template source and a new published container selection.
 

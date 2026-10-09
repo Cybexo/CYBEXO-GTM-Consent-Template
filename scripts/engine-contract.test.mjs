@@ -7,8 +7,8 @@ import vm from 'node:vm';
 const template = fs.readFileSync(new URL('../template.tpl', import.meta.url), 'utf8');
 const section = name => template.split('___' + name + '___')[1].split('\n___')[0].trim();
 const code = section('SANDBOXED_JS_FOR_WEB_TEMPLATE');
-const release = '1.5.40-23fc15424d75';
-const build = 'production.20261009.031052.runlocal.65b35513';
+const release = '1.5.41-dc8923e48269';
+const build = 'production.20261009.070006.runlocal.04a91543';
 const keys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
 const denied = Object.fromEntries(keys.map(key => [key, 'denied']));
 const granted = Object.fromEntries(keys.map(key => [key, 'granted']));
@@ -20,7 +20,7 @@ function snapshot(overrides = {}) {
     analytics: {choice: null, effective: false}, tcf: {applicable: true, valid: false, tcString: null},
     google: {signals: denied, enabled: true, owner: 'native-gtm', reason: null},
     identity: {contractVersion: 1, appId: 'CYB-fixture001', engineRelease: release,
-      engineVersion: '1.5.40', buildId: build, installationPlatform: 'gtm',
+      engineVersion: '1.5.41', buildId: build, installationPlatform: 'gtm',
       adapterVersion: 'gtm-v1.0.0', googleOwner: 'native-gtm', configurationKey: 'fixture-config'},
     error: null, ...overrides
   };
