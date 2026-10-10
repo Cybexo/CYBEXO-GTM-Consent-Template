@@ -1,13 +1,13 @@
 # Shared engine delivery
 
-This source was imported, compiled, published and qualified in the dedicated GTM container on October 9, 2026, against the shared Web CMP 1.5.42 artifact. Public Gallery promotion remains pending. See [the exact qualification scope](qualification-2026-10-09.md).
+The shared-loader template was imported, compiled and qualified in the dedicated GTM container. The latest scoped GTM runtime audit used Web CMP 1.5.48. See [current release guidance](release-2026-10-10.md) and the [historical transition qualification](qualification-2026-10-09.md).
 
 | Contract | Value |
 | --- | --- |
 | Engine loader and assets | `https://cmp.cybexo.com/loader.js`, `https://cmp.cybexo.com` |
 | Engine contract | `1` |
 | Installer and legacy installation platform | `gtm` |
-| Host platform | `direct`, or `wordpress` when declared by the CYBEXO connector |
+| Host platform | `direct`, or explicitly declared `wordpress` / `shopify` through a compatible CYBEXO connector |
 | Connector diagnostic | `gtm-v1.0.0` |
 | Google owner | `native-gtm` when enabled; `none` when app configuration disables emission |
 
@@ -17,7 +17,7 @@ The historical descriptor and unchanged bootstrap bytes remain in `publisher/` f
 
 ## Context and ownership
 
-Before defaults, the template reads CYBEXO's `cybexoCmpContextV1`, `cybexoCmpInstallationV1`, `__cybexoWpEngineInstaller` and frozen `__cybexoNativeGtmBootstrap` declarations. Conflicting App IDs, a competing installer/Google owner, unsupported Shopify or Drupal host, or conflicting WordPress host declarations stop startup before defaults, callback registration and network injection. No generic WordPress/Shopify/GTM global selects a platform. Legacy `gtm` means installer; WordPress remains a separate host.
+Before defaults, the template reads CYBEXO's `cybexoCmpContextV1`, `cybexoCmpInstallationV1`, `__cybexoWpEngineInstaller` and frozen `__cybexoNativeGtmBootstrap` declarations. Conflicting App IDs, a competing installer/Google owner, unsupported Drupal host, or conflicting WordPress host declarations stop startup before defaults, callback registration and network injection. No generic WordPress/Shopify/GTM global selects a platform. Legacy `gtm` means installer; WordPress remains a separate host.
 
 Native `setDefaultConsentState` runs before registering the sole `cybexoGtmConsentUpdate` callback. With a matching early reservation, the template then calls `cybexoCmpResumeGtm(appId)` and skips injection only on `true`; failure denies without a second load. Without a reservation it injects the common loader as before. The explicit native owner plus legacy `data-consent-mode=off` suppress the direct page writer. App-level Google off may suppress later updates, but does not retract native defaults already established before asynchronous configuration. This integration therefore does not promise zero Google initialization.
 
@@ -29,7 +29,7 @@ Download completion is not readiness. `callLater` coalesces observations and rea
 
 ## Early TCF and qualification
 
-The ordinary template path injects the loader after GTM starts. It cannot supply a TCF API to consumers that already ran outside GTM. The same public loader supports `data-gtm-bootstrap="on"` for an early synchronous reservation. Its App/host/installer/owner diagnostic is checked before native defaults. The loader's resume function rechecks current context and callback ownership, starts at most once and reports acceptance rather than readiness. No timers, separate customer bootstrap URL or long inline program are introduced. Local component cases cover waiting, delayed handoff, mismatch, duplicate and failure behavior. Dedicated GTM browser qualification is complete; WordPress host wiring and other customer containers remain separate. See [installation guidance](installation.md#tcf-page-setup).
+The ordinary template path injects the loader after GTM starts. It cannot supply a TCF API to consumers that already ran outside GTM. The same public loader supports `data-gtm-bootstrap="on"` for an early synchronous reservation. Its App/host/installer/owner diagnostic is checked before native defaults. The loader's resume function rechecks current context and callback ownership, starts at most once and reports acceptance rather than readiness. No timers, separate customer bootstrap URL or long inline program are introduced. Local component cases cover waiting, delayed handoff, mismatch, duplicate and failure behavior. Dedicated GTM browser qualification does not replace platform-specific or customer-container verification. See [installation guidance](installation.md#tcf-page-setup).
 
 ## Source validation and promotion
 
@@ -45,6 +45,6 @@ Run the actual shared source integration against the reviewed Web checkout, usin
 CYBEXO_WEB_SOURCE_ROOT=/absolute/path/to/reviewed/web/source node --test scripts/shared-engine-integration.test.mjs
 ```
 
-The latter bundles the real loader in memory and executes it with the exact template sandbox source. It covers Direct and WordPress hosts, configuration delay, one native default, no direct Google writes, choice, cancel, saved restoration, withdrawal and duplicates. The build identifier is deliberately different from the historical pinned build. It skips explicitly without a source path. Local VM tests and the embedded-scenario harness do not substitute for actual GTM compilation/import, supported permission validation, Tag Assistant, platform-browser or delivery evidence.
+The latter bundles the real loader in memory and executes it with the exact template sandbox source. It covers Direct, WordPress and Shopify hosts, configuration delay, one native default, no direct Google writes, choice, cancel, saved restoration, withdrawal and duplicates. The build identifier is deliberately different from the historical pinned build. It skips explicitly without a source path. Local VM tests and the embedded-scenario harness do not substitute for actual GTM compilation/import, supported permission validation, Tag Assistant, platform-browser or delivery evidence.
 
-Keep `metadata.yaml` unchanged until the reviewed template commit exists. Any later authorized promotion records that exact full source SHA in a subsequent metadata-only commit. Repository publication does not prove container adoption. Preserve historical immutable engine directories for retained installs; changing the common root remains part of the shared engine release gate, not an independent GTM release.
+For each publication, commit the reviewed template and documentation first, then record that exact full source SHA in a subsequent metadata-only commit. Preserve all historical version entries. Repository publication does not prove container adoption. Preserve historical immutable engine directories for retained installs; changing the common root remains part of the shared engine release gate, not an independent GTM release.

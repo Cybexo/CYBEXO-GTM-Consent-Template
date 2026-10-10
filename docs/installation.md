@@ -2,7 +2,7 @@
 
 ## TCF page setup
 
-This source is qualified in the dedicated test container; public Gallery promotion is pending. The ordinary template establishes native Google defaults before injecting the single public `https://cmp.cybexo.com/loader.js`; the loader installs the TCF stub when it executes. Consumers that run earlier need the same loader to execute synchronously before them and before the GTM container:
+Check that the Gallery revision offered to your workspace matches the [current release](release-2026-10-10.md). The ordinary template establishes native Google defaults before injecting the single public `https://cmp.cybexo.com/loader.js`; the loader installs the TCF stub when it executes. Consumers that run earlier need the same loader to execute synchronously before them and before the GTM container:
 
 ```html
 <script id="cybexo-cmp" data-settings-id="YOUR_CYB_APP_ID"
@@ -17,7 +17,7 @@ Consent Initialization orders GTM tags, not scripts that ran before GTM. Keep Go
 
 For WordPress configured to use GTM, let the compatible plugin manage its own early bootstrap and host declaration; do not add a competing manual installer. Only `data-gtm-bootstrap="on"` is supported when the attribute is present and nonempty; a typo fails instead of falling back to Direct ownership. The files in `publisher/` retain historical bootstrap evidence and are not the new customer installation program.
 
-The shared 1.5.42 artifact, dedicated-container publication, Google sandbox tests and live browser ordering passed the [October 9 qualification](qualification-2026-10-09.md). This does not qualify every customer container or a public Gallery revision. WordPress wiring is a separate milestone.
+The [October 9 qualification](qualification-2026-10-09.md) records the original shared-loader transition. The latest scoped GTM runtime audit used Web CMP 1.5.48; see [current release guidance](release-2026-10-10.md). Every customer container still needs its own preview and publication checks.
 
 ## Template fields
 
