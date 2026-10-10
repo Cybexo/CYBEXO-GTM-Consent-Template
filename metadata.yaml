@@ -1,8 +1,10 @@
 homepage: "https://cybexo.com"
-documentation: "https://developer.cybexo.com"
+documentation: "https://developer.cybexo.com/integrations/gtm-template/"
 license: "Apache-2.0"
 
 versions:
+- sha: c17c25ce4547eb9a945411f3f0085a1fc91e456e
+  changeNotes: "Uses the single shared CMP loader with native Google consent defaults and updates. TCF sites should adopt the short synchronous shared-loader setup in the installation guide. Keep the same CYB App ID and Consent Initialization trigger; review the template update, preview visitor choices and publish the container."
 - sha: c7236117947bd2239f626bf6a3c27f80220cd4e5
   changeNotes: "Refreshes the managed loader delivery URL for returning browsers. Update the template, preview and publish your container. Existing App ID, native consent ownership and saved choices are preserved."
 - sha: 6f5719dc3dec55fe5ee9fc800a8312238fe56aa0
